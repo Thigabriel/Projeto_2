@@ -16,7 +16,7 @@ import seaborn as sns
 # Exemplo usando arquivo interno
 weather_file_path = get_filepath('cordoba_climate.txt')
 weather_df = prepare_weather(weather_file_path)
-print(weather_df.head())
+# print(weather_df.head())
 # ```
 
 
@@ -38,7 +38,7 @@ solo_arenoso_franco = Soil(soil_type='SandyLoam')
 # ```python
 # Exemplo usando tipo pré-definido
 # Plantio em 1º de Outubro
-trigo = Crop(c_name='Wheat', planting_date='10/01')
+trigo = Crop(c_name='Wheat', planting_date='05/01')
 # ```
 
 
@@ -68,6 +68,6 @@ modelo = AquaCropModel(
 modelo.run_model(till_termination=True)
 
 
-# Exemplo para ver as estatísticas finais das primeiras 5 estações
-resultados_finais = modelo._outputs.final_stats
-print(resultados_finais.head())
+
+
+

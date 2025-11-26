@@ -1,0 +1,38 @@
+# Adicionando coluna de datas ao DataFrame de saída
+df_saida = modelo._outputs.water_flux
+
+data_inicio_sim = modelo._clock_struct.simulation_start_date
+data_fim_sim = modelo._clock_struct.simulation_end_date
+
+datas_simulacao = weather_df[
+    (weather_df['Date'] >= data_inicio_sim) &
+    (weather_df['Date'] <= data_fim_sim)
+]['Date']
+
+df_saida['Date'] = datas_simulacao.iloc[:len(df_saida)].values
+
+
+# Forma de conseguir visualizar uma coluna específica do DataFrame de saída
+print(df_saida.head(21))
+
+
+# Filtro de datas para visualização
+data_inicio = '1992-01-15'
+data_fim = '1992-01-20'
+
+# Intervalos específicos
+fluxo_agua_periodo = modelo._outputs.water_flux[
+    (modelo._outputs.water_flux['Date'] >= data_inicio) &
+    (modelo._outputs.water_flux['Date'] <= data_fim)
+]
+
+print(f"\nFluxo de água entre {data_inicio} e {data_fim}:")
+print(
+    fluxo_agua_periodo[['Date', 'surface_storage', 'IrrDay', 'Runoff', 'Tr']])
+
+
+# Ano especifico
+fluxo_agua = modelo._outputs.water_flux[modelo._outputs.water_flux['Date'].dt.year == 2000]
+print(f"\nDados de fluxo de água para o ano de 2000 (primeiras 5 linhas):")
+print(fluxo_agua[['Date', 'surface_storage',
+      'IrrDay', 'Runoff', 'Tr']].head())
