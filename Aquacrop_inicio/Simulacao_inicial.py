@@ -1,4 +1,4 @@
-from aquacrop import AquaCropModel, Soil, Crop, InitialWaterContent
+from aquacrop import AquaCropModel, Soil, Crop, InitialWaterContent, FieldMngt, GroundWater, IrrigationManagement
 from aquacrop.utils import prepare_weather, get_filepath
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -14,10 +14,10 @@ import seaborn as sns
 # * A biblioteca inclui arquivos climáticos de exemplo (como `tunis_climate.txt`). A função `get_filepath()` pode ser usada para acessar o caminho desses arquivos internos.
 # ```python
 # Exemplo usando arquivo interno
-weather_file_path = get_filepath('cordoba_climate.txt')
+weather_file_path = 'imperatriz_climate.txt'
 weather_df = prepare_weather(weather_file_path)
 # print(weather_df.head())
-# ```
+#
 
 
 # b.  #**Solo (Soil):**
@@ -27,7 +27,17 @@ weather_df = prepare_weather(weather_file_path)
 # ```python
 # Exemplo usando tipo pré-definido
 solo_arenoso_franco = Soil(soil_type='SandyLoam')
-# ```
+
+#Exemplo de solo personalizado
+#solo_custom = Soil(soil_type='custom', cn=78, rew=8.5)
+#solo_custom.add_layer_from_texture(thickness=0.4,
+#                                Sand=55, Clay=25, OrgMat=2.0,
+#                                penetrability=90)
+
+#solo_custom.add_layer_from_texture(thickness=0.8,
+#                               Sand=15, Clay=45, OrgMat=2.5,
+#                                penetrability=75)
+
 
 
 # c.  #**Cultura (Crop):**
@@ -38,7 +48,8 @@ solo_arenoso_franco = Soil(soil_type='SandyLoam')
 # ```python
 # Exemplo usando tipo pré-definido
 # Plantio em 1º de Outubro
-trigo = Crop(c_name='Wheat', planting_date='05/01')
+trigo = Crop(c_name='Tomato', planting_date='05/01')
+       
 # ```
 
 
@@ -49,25 +60,45 @@ trigo = Crop(c_name='Wheat', planting_date='05/01')
 # ```python
 # Exemplo: Iniciar na Capacidade de Campo
 iwc = InitialWaterContent(value=['FC'])
-# ```
 
+manejo_campo= FieldMngt(mulches=True,   # Habilita mulch
+                        mulch_pct=80,    # 80% de cobertura
+                        f_mulch=0.3 ) 
+
+gw = GroundWater(water_table='Y',
+            dates=[f'{1979}/10/03'],
+            values=[2])
+
+irrig_limiar = IrrigationManagement(irrigation_method=2,      # Método por Limiar de Depleção
+                                    SMT=[50,50,50,50], # Limiar de 50% TAW para todos os estágios
+                                    AppEff=90,        # Eficiência de aplicação de 90%
+                                    MaxIrr=50,        # Limita a 50mm por evento (se AmountType='Fixed') - aqui não terá efeito
+                                    AmountType='Variable' # Irrigar para voltar à Capacidade de Campo
+                                    )
 
 # e.  #**Período de Simulação:**
 # * As datas de início (`sim_start_time`) e fim (`sim_end_time`) da simulação são #definidas ao criar o objeto do modelo principal, no formato 'AAAA/MM/DD'.
 
 
 modelo = AquaCropModel(
-    sim_start_time='1991/05/01',
-    sim_end_time='2004/05/30',
+    sim_start_time='2022/01/02', 
+    sim_end_time='2024/12/31',
     weather_df=weather_df,
     soil=solo_arenoso_franco,
-    crop=trigo,
-    initial_water_content=iwc
+    crop=trigo ,
+    initial_water_content=iwc,
+    field_management= manejo_campo,
+    groundwater=gw,
+    irrigation_management=irrig_limiar
 )
 
 modelo.run_model(till_termination=True)
 
+# ... (código existente)
 
+# Exibir os resultados finais (Produtividade e Irrigação por estação)
+resultados = modelo.get_simulation_results()
+print(resultados.head())
 
 
 
