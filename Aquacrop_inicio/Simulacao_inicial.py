@@ -48,7 +48,7 @@ solo_arenoso_franco = Soil(soil_type='SandyLoam')
 # ```python
 # Exemplo usando tipo pré-definido
 # Plantio em 1º de Outubro
-trigo = Crop(c_name='Tomato', planting_date='05/01')
+trigo = Crop(c_name='Tomato', planting_date='01/07')
        
 # ```
 
@@ -61,19 +61,20 @@ trigo = Crop(c_name='Tomato', planting_date='05/01')
 # Exemplo: Iniciar na Capacidade de Campo
 iwc = InitialWaterContent(value=['FC'])
 
-manejo_campo= FieldMngt(mulches=True,   # Habilita mulch
-                        mulch_pct=80,    # 80% de cobertura
+manejo_campo= FieldMngt(mulches=True,   
+                        mulch_pct=80,    
                         f_mulch=0.3 ) 
 
 gw = GroundWater(water_table='Y',
-            dates=[f'{1979}/10/03'],
+            dates=[f'{2022}/10/03'],
             values=[2])
 
-irrig_limiar = IrrigationManagement(irrigation_method=2,      # Método por Limiar de Depleção
-                                    SMT=[50,50,50,50], # Limiar de 50% TAW para todos os estágios
-                                    AppEff=90,        # Eficiência de aplicação de 90%
-                                    MaxIrr=50,        # Limita a 50mm por evento (se AmountType='Fixed') - aqui não terá efeito
-                                    AmountType='Variable' # Irrigar para voltar à Capacidade de Campo
+irrig_limiar = IrrigationManagement(irrigation_method=2,     
+                                    SMT=[50], 
+                                    AppEff=90,        
+                                    MaxIrr=50,        
+                                    AmountType='Variable',
+                                    IrrInterval = 2
                                     )
 
 # e.  #**Período de Simulação:**
@@ -81,8 +82,8 @@ irrig_limiar = IrrigationManagement(irrigation_method=2,      # Método por Limi
 
 
 modelo = AquaCropModel(
-    sim_start_time='2022/01/02', 
-    sim_end_time='2024/12/31',
+    sim_start_time='2022/01/01',
+    sim_end_time='2024/04/30',
     weather_df=weather_df,
     soil=solo_arenoso_franco,
     crop=trigo ,
@@ -94,11 +95,50 @@ modelo = AquaCropModel(
 
 modelo.run_model(till_termination=True)
 
-# ... (código existente)
 
-# Exibir os resultados finais (Produtividade e Irrigação por estação)
-resultados = modelo.get_simulation_results()
-print(resultados.head())
+
+
+df_saida1 = modelo.get_water_flux()
+df_saida2 = modelo.get_crop_growth()
+df_saida3 = modelo.get_water_storage()
+
+
+data_inicio_sim = modelo._clock_struct.simulation_start_date
+data_fim_sim = modelo._clock_struct.simulation_end_date
+
+datas_simulacao = weather_df[
+    (weather_df['Date'] >= data_inicio_sim) &
+    (weather_df['Date'] <= data_fim_sim)
+]['Date']
+
+
+df_saida1['Date'] = datas_simulacao.iloc[:len(df_saida1)].values
+df_saida2['Date'] = datas_simulacao.iloc[:len(df_saida2)].values
+df_saida3['Date'] = datas_simulacao.iloc[:len(df_saida3)].values 
+
+
+data_inicio = '2022-01-01'
+data_fim = '2022-04-30'
+
+Planta = df_saida2[ 
+    (df_saida2['Date'] >= data_inicio) &
+    (df_saida2['Date'] <= data_fim)
+]
+
+Agua = df_saida1[
+    (df_saida1['Date'] >= data_inicio) &
+    (df_saida1['Date'] <= data_fim)
+]
+
+Solo = df_saida3[ 
+    (df_saida3['Date'] >= data_inicio) &
+    (df_saida3['Date'] <= data_fim)
+]
+
+
+print(Agua[['Date','IrrDay']].head(20))
+print(Solo[['Date','th1']].head(20))
+
 
 
 

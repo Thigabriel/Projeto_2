@@ -1,9 +1,11 @@
 import pandas as pd
 import numpy as np
 import math
+import os
+import glob
 
 # --- CONFIGURAÇÕES ---
-ARQUIVO_ENTRADA = 'dados_imperatriz_limpos_unificado(2022_2025).csv'
+PASTA_ENTRADA = 'Dados_ajustados_Inmet'  # Nome da pasta com os CSVs limpos
 ARQUIVO_SAIDA_AQUACROP = 'imperatriz_climate.txt'
 
 # Constantes de Imperatriz - MA
@@ -14,6 +16,10 @@ def calcular_eto_pm(row):
     """Calcula ETo (Penman-Monteith FAO-56)."""
     # Lê as colunas do CSV limpo
     Tmin, Tmax = row['tmin'], row['tmax']
+    # Tratamento para garantir que não haja divisão por zero ou erro se faltar dado
+    if pd.isna(Tmin) or pd.isna(Tmax):
+        return np.nan
+        
     Rh, u2_raw, Rs_raw = row['rh'], row['vento'], row['rad']
     
     # Conversões de Unidade
@@ -34,8 +40,6 @@ def calcular_eto_pm(row):
     gamma = 0.000665 * P
     
     # Radiação Extraterrestre (Ra)
-    # O índice do DataFrame é DatetimeIndex? Se sim, usamos dayofyear. 
-    # Se lemos do CSV, precisamos converter a coluna de data ou usar row.name se definido.
     doy = row.name.dayofyear
     dr = 1 + 0.033 * np.cos(2 * np.pi * doy / 365)
     decl = 0.409 * np.sin((2 * np.pi * doy / 365) - 1.39)
@@ -54,15 +58,38 @@ def calcular_eto_pm(row):
     return num / den if den != 0 else 0
 
 # --- EXECUÇÃO ---
-print("--- ETAPA 2: GERAÇÃO DO ARQUIVO AQUACROP ---")
+print("--- ETAPA 2: GERAÇÃO DO ARQUIVO AQUACROP (MÚLTIPLOS ARQUIVOS) ---")
 
 try:
-    # Carregar dados limpos
-    # Precisamos converter a primeira coluna (index) de volta para datetime
-    df = pd.read_csv(ARQUIVO_ENTRADA, sep=';', index_col=0, parse_dates=True)
-    print(f"Dados limpos carregados: {len(df)} dias.")
+    # 1. Encontrar todos os arquivos CSV na pasta
+    arquivos_csv = glob.glob(os.path.join(PASTA_ENTRADA, '*.csv'))
     
-    # Calcular ETo
+    if not arquivos_csv:
+        raise FileNotFoundError(f"Nenhum arquivo .csv encontrado na pasta '{PASTA_ENTRADA}'")
+    
+    print(f"Encontrados {len(arquivos_csv)} arquivos para processar.")
+    
+    # 2. Ler e concatenar todos os arquivos
+    lista_dfs = []
+    for arquivo in arquivos_csv:
+        print(f"Lendo: {os.path.basename(arquivo)}")
+        # Assume que os arquivos já estão limpos (separador ';', decimal '.')
+        df_temp = pd.read_csv(arquivo, sep=';', index_col=0, parse_dates=True)
+        lista_dfs.append(df_temp)
+    
+    # Unifica em um único DataFrame
+    df = pd.concat(lista_dfs)
+    
+    # 3. Ordenar por data (CRUCIAL para o AquaCrop não se perder)
+    df.sort_index(inplace=True)
+    
+    # Remove duplicatas de data se houver sobreposição entre arquivos
+    df = df[~df.index.duplicated(keep='first')]
+    
+    print(f"Total de dias carregados: {len(df)}")
+    print(f"Período: {df.index.min().date()} até {df.index.max().date()}")
+    
+    # 4. Calcular ETo
     print("Calculando ETo...")
     df['ETo'] = df.apply(calcular_eto_pm, axis=1)
     
@@ -74,9 +101,6 @@ try:
     df_final['Day'] = df_final.index.day
     df_final['Month'] = df_final.index.month
     df_final['Year'] = df_final.index.year
-    
-    # Selecionar e ordenar
-    colunas_saida = ['Day', 'Month', 'Year', 'tmin', 'tmax', 'precip', 'ETo']
     
     print(f"Salvando '{ARQUIVO_SAIDA_AQUACROP}'...")
     with open(ARQUIVO_SAIDA_AQUACROP, 'w') as f:
@@ -90,8 +114,7 @@ try:
             
     print("Arquivo de clima pronto para uso!")
 
-except FileNotFoundError:
-    print(f"ERRO: Arquivo '{ARQUIVO_ENTRADA}' não encontrado.")
-    print("Execute o script 'limpar_csvs.py' primeiro.")
+except FileNotFoundError as e:
+    print(f"ERRO: {e}")
 except Exception as e:
-    print(f"Ocorreu um erro: {e}")
+    print(f"Ocorreu um erro inesperado: {e}")
