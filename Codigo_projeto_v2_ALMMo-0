@@ -1,0 +1,152 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy.spatial import distance
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, r2_score
+import os
+import pickle
+
+# ==============================================================================
+#  CLASSE: ALMMo-0 (Robustez via Médias Ponderadas)
+# ==============================================================================
+class ALMMo0:
+    def __init__(self, raio_influencia=0.20): # Ajustado para 0.20 (Melhor performance)
+        self.r = raio_influencia
+        self.centers = []   
+        self.outputs = []   
+        self.counts = []    
+        self.n_rules = 0
+        self.min_val = None
+        self.max_val = None
+
+    def fit(self, X, y):
+        X = np.array(X)
+        y = np.array(y)
+        
+        # Normalização Global
+        self.min_val = X.min(axis=0)
+        self.max_val = X.max(axis=0)
+        denom = self.max_val - self.min_val
+        denom[denom == 0] = 1.0 
+        X_norm = (X - self.min_val) / denom
+
+        print(f"--- Iniciando Treinamento ALMMo-0 ({len(X)} amostras) ---")
+
+        for i, sample in enumerate(X_norm):
+            target = y[i]
+
+            if self.n_rules == 0:
+                self.centers.append(sample)
+                self.outputs.append(target)
+                self.counts.append(1)
+                self.n_rules += 1
+                continue
+
+            # Calcular distâncias
+            dists = distance.cdist([sample], self.centers, metric='euclidean')[0]
+            nearest_idx = np.argmin(dists)
+            min_dist = dists[nearest_idx]
+
+            # Evolução
+            if min_dist > self.r:
+                self.centers.append(sample)
+                self.outputs.append(target)
+                self.counts.append(1)
+                self.n_rules += 1
+            else:
+                old_center = self.centers[nearest_idx]
+                k = self.counts[nearest_idx]
+                new_center = ((old_center * k) + sample) / (k + 1)
+                self.centers[nearest_idx] = new_center
+
+                old_out = self.outputs[nearest_idx]
+                new_out = ((old_out * k) + target) / (k + 1)
+                self.outputs[nearest_idx] = new_out
+                self.counts[nearest_idx] += 1
+        
+        print(f"Treinamento Concluído! Regras Criadas: {self.n_rules}")
+
+    def predict(self, X):
+        X = np.array(X)
+        denom = self.max_val - self.min_val
+        denom[denom == 0] = 1.0
+        X_norm = (X - self.min_val) / denom
+        
+        preds = []
+
+        for sample in X_norm:
+            dists = distance.cdist([sample], self.centers, metric='euclidean')[0]
+            similarity = 1 / (dists**2 + 1e-6)
+            weights = similarity / np.sum(similarity)
+            y_pred = np.sum(weights * np.array(self.outputs))
+            preds.append(y_pred)
+            
+        return np.array(preds)
+
+    def print_rules(self, feature_names):
+        print("\n" + "="*60)
+        print(" BASE DE CONHECIMENTO (ALMMo-0)")
+        print("="*60)
+        indices = np.argsort(self.counts)[::-1]
+        for i in indices:
+            if self.counts[i] < 5: continue
+            center_real = self.centers[i] * (self.max_val - self.min_val) + self.min_val
+            output_val = self.outputs[i]
+            print(f"REGRA #{i+1} (Peso: {self.counts[i]} dias):")
+            conds = [f"{name} ≈ {val:.1f}" for name, val in zip(feature_names, center_real)]
+            print(f"  SE   ({ ' E '.join(conds) })")
+            print(f"  ENTÃO Irrigação Média = {output_val:.2f} mm")
+            print("-" * 60)
+
+# ==============================================================================
+#  EXECUÇÃO
+# ==============================================================================
+arquivo_dataset = 'dataset_imperatriz_ajustado.csv'
+
+if not os.path.exists(arquivo_dataset):
+    print("Dataset não encontrado.")
+    exit()
+
+df = pd.read_csv(arquivo_dataset)
+
+features = ['Tensao_Media_Atual_kPa', 'Chuva_Acumulada_3d_mm', 'Tmax_Futura_3d_C']
+X = df[features].values
+y = df['Irrigacao_mm'].values
+
+# --- A CORREÇÃO MÁGICA: SHUFFLE=TRUE ---
+# Misturamos os dados para que o treino veja tanto a seca quanto a chuva
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42, shuffle=True)
+
+# TREINO ALMMo-0
+modelo = ALMMo0(raio_influencia=0.20) 
+modelo.fit(X_train, y_train)
+
+# TESTE
+y_pred = modelo.predict(X_test)
+
+# MÉTRICAS
+r2 = r2_score(y_test, y_pred)
+rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+
+print(f"\nRESULTADOS FINAIS (Com Shuffle):")
+print(f"R²: {r2:.4f} (Deve ser > 0.50)")
+print(f"RMSE: {rmse:.2f} mm")
+
+modelo.print_rules(features)
+
+# SALVAR
+with open('modelo_almmo_final.pkl', 'wb') as f:
+    pickle.dump(modelo, f)
+
+# GRÁFICO (Primeiros 100 dias do teste aleatório)
+plt.figure(figsize=(15, 6))
+limit = 100
+plt.plot(y_test[:limit], label='Real (Net Irrigation)', color='blue', alpha=0.6, linewidth=2)
+plt.plot(y_pred[:limit], label='Previsão ALMMo-0', color='red', linestyle='--', linewidth=2)
+plt.title(f'Validação Final: ALMMo-0 Shuffle (R²={r2:.2f})')
+plt.ylabel('Irrigação (mm)')
+plt.xlabel('Amostras de Teste')
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.show()
