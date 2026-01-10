@@ -1,0 +1,197 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from aquacrop import AquaCropModel, Soil, Crop, InitialWaterContent, FieldMngt, GroundWater, IrrigationManagement
+from aquacrop.utils import prepare_weather, get_filepath
+
+# ==============================================================================
+#  PARTE 1: FUNÇÃO DE TRADUÇÃO (SAXTON & RAWLS, 2006)
+#  Converte Umidade Volumétrica (AquaCrop) -> Tensão Matricial (Tensiômetro)
+# ==============================================================================
+def converter_theta_para_kPa_saxton_rawls(theta_v, areia, argila, mo=2.5):
+    """  
+    Parâmetros:
+      theta_v: Umidade atual do solo (m3/m3), vinda do AquaCrop.
+      areia: % de Areia (será convertida para fração 0-1 automaticamente).
+      argila: % de Argila (será convertida para fração 0-1 automaticamente).
+      mo: % de Matéria Orgânica (manter em %, ex: 2.5).
+    """
+    theta = np.array(theta_v, dtype=float)
+    
+    # --- CORREÇÃO DE UNIDADES ---
+    # As equações de regressão exigem Areia/Argila em FRAÇÃO (0.0 - 1.0)
+    # Se o valor for maior que 1 (ex: 65), dividimos por 100.
+    S = float(areia)
+    if S > 1.0: S = S / 100.0
+        
+    C = float(argila)
+    if C > 1.0: C = C / 100.0
+    
+    MO = float(mo) # MO é usada em percentagem (ex: 2.5) nas equações
+    
+    # 1. Calcular Theta a 33kPa (Capacidade de Campo) e 1500kPa (Ponto de Murcha)
+    # Equações de Saxton & Rawls (2006), Tabela 1
+    
+    # Theta 1500 (Ponto de Murcha)
+    theta_1500t = -0.024*S + 0.487*C + 0.006*MO + 0.005*(S*MO) - 0.013*(C*MO) + 0.068*(S*C) + 0.031
+    
+    # Theta 33 (Capacidade de Campo - Estimativa inicial)
+    theta_33t = -0.251*S + 0.195*C + 0.011*MO + 0.006*(S*MO) - 0.027*(C*MO) + 0.452*(S*C) + 0.299
+    
+    # Theta 33 (Ajuste para densidade normal)
+    theta_33 = theta_33t + (1.283 * (theta_33t**2) - 0.374 * theta_33t - 0.015)
+    
+    # Proteções matemáticas (para evitar log de zero ou números negativos em solos extremos)
+    theta_33 = max(0.001, theta_33)
+    theta_1500t = max(0.0001, min(theta_1500t, theta_33 - 0.01))
+
+    # 2. Calcular A e B (Coeficientes da curva de retenção)
+    # Eq. 15: Inclinação B
+    numerador_B = np.log(1500) - np.log(33)
+    denominador_B = np.log(theta_33) - np.log(theta_1500t)
+    
+    # --- CORREÇÃO AQUI ---
+    B = numerador_B / denominador_B
+    
+    # Eq. 14: Coeficiente A
+    A = np.exp(np.log(33) + B * np.log(theta_33))
+
+    # 3. Calcular Tensão (Psi) - Eq. 11
+    # Psi = A * theta ^ (-B)
+    # Adicionamos 1e-6 para evitar divisão por zero se o solo estiver totalmente seco
+    tensao_kPa = A * np.power(theta + 1e-6, -B)
+    
+    
+    return tensao_kPa
+
+# ==============================================================================
+#  PARTE 2: CONFIGURAÇÃO DO MODELO AQUACROP
+# ==============================================================================
+
+# a. Dados Climáticos
+# -------------------
+# Certifique-se que este arquivo está na mesma pasta
+weather_file_path = 'imperatriz_climate.txt' 
+try:
+    weather_df = prepare_weather(weather_file_path)
+except:
+    print(f"Aviso: Arquivo '{weather_file_path}' não encontrado. Usando exemplo interno 'tunis'.")
+    weather_file_path = get_filepath('tunis_climate.txt')
+    weather_df = prepare_weather(weather_file_path)
+
+# b. Solo (Definição Personalizada)
+# ---------------------------------
+# Definimos a textura EXATA aqui para usar os MESMOS valores na conversão depois.
+# Exemplo: Solo Franco-Arenoso
+areia_input = 65.0   # %
+argila_input = 10.0  # %
+mo_input = 2.5       # %
+
+solo_custom = Soil(soil_type='custom')
+solo_custom.add_layer_from_texture(
+    thickness=1.2,      
+    Sand=areia_input,    
+    Clay=argila_input,   
+    OrgMat=mo_input,     
+    penetrability=100
+)
+
+# c. Cultura
+# ----------
+trigo = Crop(c_name='Tomato', planting_date='01/07') # Tomate plantado em 01 Julho
+
+# d. Conteúdo Inicial de Água
+# ---------------------------
+# Iniciar na Capacidade de Campo (FC)
+iwc = InitialWaterContent(value=['FC'])
+
+# Manejo de Campo (Mulch)
+manejo_campo = FieldMngt(mulches=True, mulch_pct=80, f_mulch=0.3) 
+
+# Lençol Freático
+gw = GroundWater(water_table='N') # Desligado para simplificar
+
+# e. Manejo de Irrigação
+# ----------------------
+# Irrigar quando a umidade cair para 50% da água disponível
+irrig_limiar = IrrigationManagement(
+    irrigation_method=2,     
+    SMT=[50], 
+    AppEff=90,        
+    MaxIrr=50,        
+    AmountType='Variable',
+    IrrInterval=2
+)
+
+# f. Configuração da Simulação
+# ----------------------------
+modelo = AquaCropModel(
+    sim_start_time='2022/01/01',
+    sim_end_time='2022/04/30',
+    weather_df=weather_df,
+    soil=solo_custom,       # IMPORTANTE: Usar o solo customizado
+    crop=trigo,
+    initial_water_content=iwc,
+    field_management=manejo_campo,
+    groundwater=gw,
+    irrigation_management=irrig_limiar
+)
+
+# Rodar a simulação
+modelo.run_model(till_termination=True)
+
+# ==============================================================================
+#  PARTE 3: PÓS-PROCESSAMENTO E CONVERSÃO
+# ==============================================================================
+
+# 1. Obter dados de saída (Umidade do Solo)
+df_saida3 = modelo.get_water_storage()
+# df_saida3['th1'] é a umidade volumétrica da camada 1
+
+# 2. Obter dados de fluxo (Irrigação)
+df_saida1 = modelo.get_water_flux()
+
+# 3. Ajustar Datas
+data_inicio_sim = modelo._clock_struct.simulation_start_date
+data_fim_sim = modelo._clock_struct.simulation_end_date
+datas_simulacao = weather_df[
+    (weather_df['Date'] >= data_inicio_sim) &
+    (weather_df['Date'] <= data_fim_sim)
+]['Date']
+
+# Alinhar datas aos dataframes
+df_saida3['Date'] = datas_simulacao.iloc[:len(df_saida3)].values
+df_saida1['Date'] = datas_simulacao.iloc[:len(df_saida1)].values
+
+# 4. APLICAR A TRADUÇÃO (CRIAR DADOS DO TENSIÔMETRO)
+# Usamos a função criada com os MESMOS parâmetros de textura do solo
+df_saida3['tensao1_kPa'] = converter_theta_para_kPa_saxton_rawls(
+    df_saida3['th1'], 
+    areia=areia_input, 
+    argila=argila_input, 
+    mo=mo_input
+)
+
+# ==============================================================================
+#  PARTE 4: RESULTADOS
+# ==============================================================================
+
+print("\n--- RESULTADO FINAL: DADOS SINTÉTICOS PARA TREINO ---")
+print(f"Solo Configurado: Areia={areia_input}%, Argila={argila_input}%, MO={mo_input}%")
+print("-" * 60)
+print(df_saida3[['Date', 'th1', 'tensao1_kPa']].head(15))
+
+# Exportar para CSV (Opcional - para usar no treino da IA)
+# df_saida3.to_csv('dataset_treino_tensiometro.csv', index=False)
+
+# Visualização Rápida (Gráfico)
+plt.figure(figsize=(10, 6))
+sns.lineplot(data=df_saida3, x='Date', y='tensao1_kPa', label='Tensão Simulada (kPa)')
+plt.axhline(y=33, color='r', linestyle='--', label='Capacidade de Campo (ref)')
+plt.ylabel('Tensão Matricial (kPa)')
+plt.title('Simulação do Tensiômetro (AquaCrop + Saxton & Rawls)')
+plt.xticks(rotation=45)
+plt.legend()
+plt.tight_layout()
+plt.show()
