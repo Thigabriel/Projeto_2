@@ -1,0 +1,148 @@
+import os
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from aquacrop import AquaCropModel, Soil, Crop, InitialWaterContent, FieldMngt, GroundWater, IrrigationManagement
+from aquacrop.utils import prepare_weather
+
+
+#  CONFIGURAÇÃO INICIAL 
+# Se estiver no Colab e precisar fazer upload, descomente as linhas abaixo:
+# from google.colab import files
+# uploaded = files.upload()
+# arquivo_clima = list(uploaded.keys())[0]
+
+# Se estiver no VS Code, apenas garanta que o arquivo está na pasta:
+arquivo_clima = 'imperatriz_climate.txt'
+
+#  PARTE 1: FUNÇÃO FÍSICA (SAXTON & RAWLS)
+def converter_theta_para_mbar_saxton_rawls(theta_v, areia, argila, mo=2.5):
+    """
+    Converte Umidade Volumétrica -> Tensão (mbar).
+    """
+    theta = np.array(theta_v, dtype=float)
+    S = float(areia) / 100.0 if float(areia) > 1.0 else float(areia)
+    C = float(argila) / 100.0 if float(argila) > 1.0 else float(argila)
+    MO = float(mo)
+    
+    # 1. Theta 33kPa e 1500kPa
+    theta_1500t = -0.024*S + 0.487*C + 0.006*MO + 0.005*(S*MO) - 0.013*(C*MO) + 0.068*(S*C) + 0.031
+    theta_33t = -0.251*S + 0.195*C + 0.011*MO + 0.006*(S*MO) - 0.027*(C*MO) + 0.452*(S*C) + 0.299
+    theta_33 = theta_33t + (1.283 * (theta_33t**2) - 0.374 * theta_33t - 0.015)
+    
+    theta_33 = max(0.001, theta_33)
+    theta_1500t = max(0.0001, min(theta_1500t, theta_33 - 0.01))
+
+    # 2. Coeficientes A e B
+    B = (np.log(1500) - np.log(33)) / (np.log(theta_33) - np.log(theta_1500t))
+    A = np.exp(np.log(33) + B * np.log(theta_33))
+
+    # 3. Tensão Final (mbar)
+    tensao_kPa = A * np.power(theta + 1e-6, -B)
+    return tensao_kPa * 10.0 # 1 kPa = 10 mbar
+
+
+#  PARTE 2: SIMULAÇÃO AQUACROP
+
+if not os.path.exists(arquivo_clima):
+    print(f"ERRO: Arquivo '{arquivo_clima}' não encontrado.")
+    exit()
+
+print(f"1. Lendo clima de: {arquivo_clima}...")
+weather_df = prepare_weather(arquivo_clima)
+data_min = weather_df['Date'].min().strftime('%Y/%m/%d')
+data_max = weather_df['Date'].max().strftime('%Y/%m/%d')
+print(f"   Período: {data_min} até {data_max}")
+
+# Configuração do Solo (Franco-Arenoso)
+solo = Soil(soil_type='custom')
+solo.add_layer_from_texture(thickness=1.2, Sand=65, Clay=10, OrgMat=2.5, penetrability=100)
+
+# Configuração da Cultura (Data Dinâmica)
+data_plantio = (pd.to_datetime(data_min) + pd.Timedelta(days=5)).strftime('%m/%d')
+trigo = Crop(c_name='Tomato', planting_date=data_plantio)
+
+# Configuração de Irrigação (Professor)
+# Threshold 50% TAW -> Enche até Field Capacity
+irrig_mng = IrrigationManagement(irrigation_method=2, SMT=[50], MaxIrr=50, AmountType='Variable')
+
+print("2. Rodando Simulação (Aguarde)...")
+model = AquaCropModel(
+    sim_start_time=data_min,
+    sim_end_time=data_max,
+    weather_df=weather_df,
+    soil=solo,
+    crop=trigo,
+    initial_water_content=InitialWaterContent(value=['FC']),
+    field_management=FieldMngt(mulches=True, mulch_pct=80, f_mulch=0.3),
+    irrigation_management=irrig_mng
+)
+model.run_model(till_termination=True)
+
+
+#  PARTE 3: CONSTRUÇÃO DO DATASET (COM CORREÇÕES)
+print("3. Processando Dados...")
+df_store = model.get_water_storage()
+df_flux = model.get_water_flux()
+
+# Sincronizar Datas
+datas = weather_df[(weather_df['Date'] >= pd.to_datetime(model.sim_start_time)) & 
+                   (weather_df['Date'] <= pd.to_datetime(model.sim_end_time))]['Date'].values
+df = pd.DataFrame({'Date': datas[:len(df_store)]})
+
+# --- A. TENSÃO (INPUT: ESTADO INICIAL DO DIA) ---
+# Tensão de ONTEM define o estado ao amanhecer de HOJE.
+th3 = df_store['th3'].values
+th6 = df_store['th6'].values
+tensao_raw = (converter_theta_para_mbar_saxton_rawls(th3, 65, 10) + 
+              converter_theta_para_mbar_saxton_rawls(th6, 65, 10)) / 2
+
+df['Tensao_Media_Atual_mbar'] = pd.Series(tensao_raw).shift(1)
+
+# --- B. VARIÁVEIS FUTURAS (INPUT: PREVISÃO D+1, D+2, D+3) ---
+df_clima = pd.merge(df, weather_df[['Date', 'Precipitation', 'MaxTemp']], on='Date', how='left')
+
+# Configurar a "Janela para Frente" (Forward Window)
+# Isso garante que a soma pegue D+0, D+1, D+2.
+# Como aplicamos o shift(-1) ANTES, ele vai pegar (D+1, D+2, D+3).
+indexer = pd.api.indexers.FixedForwardWindowIndexer(window_size=3)
+
+# Chuva Acumulada: Começa amanhã (shift -1) e soma os 3 dias seguintes (indexer)
+df['Chuva_Acumulada_3d_mm'] = df_clima['Precipitation'].shift(-1).rolling(window=indexer).sum()
+
+# Temp Máxima: Começa amanhã (shift -1) e pega a maior dos 3 dias seguintes
+df['Tmax_Futura_3d_C'] = df_clima['MaxTemp'].shift(-1).rolling(window=indexer).max()
+
+# --- C. TARGET (AÇÃO: O QUE FAZER HOJE) ---
+col_irrig = 'IrrDay' if 'IrrDay' in df_flux.columns else 'irrigation'
+df['Irrigacao_mm'] = df_flux[col_irrig].values
+
+#  PARTE 4: LIMPEZA 
+
+print("4. Limpando Dataset...")
+linhas_antes = len(df)
+
+# 1. Remove NaNs (gerados pelo shift no início e rolling no fim)
+df.dropna(inplace=True)
+
+# 2. REMOVE ENTRESSAFRA (Valores Infinitos/Absurdos)
+# Quando não tem planta, o AquaCrop às vezes zera a umidade -> Tensão explode para 1e+30
+# Filtramos qualquer tensão acima de 30.000 mbar (solo extremamente seco/inválido)
+df = df[df['Tensao_Media_Atual_mbar'] < 30000.0]
+
+linhas_depois = len(df)
+print(f"   - Linhas removidas (Entressafra/Erros): {linhas_antes - linhas_depois}")
+print(f"   - Linhas finais válidas: {linhas_depois}")
+
+
+#  PARTE 5: SALVAR
+
+nome_saida = 'dataset_imperatriz_ajustado.csv'
+df.to_csv(nome_saida, index=False)
+
+print("\n" + "="*50)
+print(f"SUCESSO! Arquivo salvo: {nome_saida}")
+print("="*50)
+print(df.head())
+print("-" * 50)
+print(df.describe()[['Tensao_Media_Atual_mbar', 'Irrigacao_mm']])
