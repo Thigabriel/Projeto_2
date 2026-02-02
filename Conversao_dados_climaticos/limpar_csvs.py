@@ -4,8 +4,8 @@ import os
 import glob
 
 # --- CONFIGURAÇÕES ---
-PASTA_ENTRADA = 'Dados__inmet'
-ARQUIVO_SAIDA_LIMPO = 'dados_imperatriz_limpos_unificado(2022_2025).csv'
+PASTA_ENTRADA = 'Dados_inmet_SL'
+ARQUIVO_SAIDA_LIMPO = 'dados_SL_limpos_unificado(2021_2024).csv'
 
 def carregar_e_unificar(pasta):
     """Lê todos os CSVs e remove duplicatas brutas."""

@@ -5,8 +5,8 @@ import os
 import glob
 
 # --- CONFIGURAÇÕES ---
-PASTA_ENTRADA = 'Dados_ajustados_Inmet'  # Nome da pasta com os CSVs limpos
-ARQUIVO_SAIDA_AQUACROP = 'imperatriz_climate.txt'
+PASTA_ENTRADA = 'Dados_ajustados_Inmet_SL'  # Nome da pasta com os CSVs limpos
+ARQUIVO_SAIDA_AQUACROP = 'SL_climate.txt'
 
 # Constantes de Imperatriz - MA
 LATITUDE = -5.52
