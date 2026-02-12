@@ -1,0 +1,196 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy.spatial import distance
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, r2_score
+import os
+import random
+import time
+
+# ==============================================================================
+#  CLASSE BASE: ALMMo-1
+# ==============================================================================
+class ALMMo1:
+    def __init__(self, raio_influencia=0.45):
+        self.r = raio_influencia
+        self.centers = []       
+        self.counts = []        
+        self.thetas = []        
+        self.cov_matrices = []
+        self.n_rules = 0
+        self.min_val = None
+        self.max_val = None
+        self.r2_individual = None # Vai guardar a nota desse modelo
+
+    def _add_rule(self, x, y):
+        self.centers.append(x)
+        self.counts.append(1)
+        n_features = len(x)
+        theta = np.zeros(n_features + 1) 
+        P = np.eye(n_features + 1) * 1000.0
+        self.thetas.append(theta)
+        self.cov_matrices.append(P)
+        self.n_rules += 1
+        self._update_rls(self.n_rules - 1, x, y)
+
+    def _update_rule(self, idx, x, y):
+        k = self.counts[idx]
+        self.centers[idx] = ((self.centers[idx] * k) + x) / (k + 1)
+        self.counts[idx] += 1
+        self._update_rls(idx, x, y)
+
+    def _update_rls(self, idx, x, y):
+        x_ext = np.insert(x, 0, 1.0)
+        P = self.cov_matrices[idx]
+        theta = self.thetas[idx]
+        Px = np.dot(P, x_ext)
+        gain_factor = 1.0 + np.dot(x_ext.T, Px)
+        K = Px / gain_factor
+        prediction = np.dot(theta, x_ext)
+        error = y - prediction
+        self.thetas[idx] = theta + K * error
+        self.cov_matrices[idx] = P - np.outer(K, x_ext.T).dot(P)
+
+    def fit(self, X, y):
+        X = np.array(X)
+        y = np.array(y)
+        if self.min_val is None:
+            self.min_val = X.min(axis=0)
+            self.max_val = X.max(axis=0)
+        denom = self.max_val - self.min_val
+        denom[denom == 0] = 1.0
+        X_norm = (X - self.min_val) / denom
+        
+        for i, sample in enumerate(X_norm):
+            target = y[i]
+            if self.n_rules == 0:
+                self._add_rule(sample, target)
+                continue
+            dists = distance.cdist([sample], self.centers, metric='euclidean')[0]
+            nearest_idx = np.argmin(dists)
+            if dists[nearest_idx] > self.r:
+                self._add_rule(sample, target)
+            else:
+                self._update_rule(nearest_idx, sample, target)
+
+    def predict(self, X):
+        X = np.array(X)
+        denom = self.max_val - self.min_val
+        denom[denom == 0] = 1.0
+        X_norm = (X - self.min_val) / denom
+        preds = []
+        for sample in X_norm:
+            if self.n_rules == 0: 
+                preds.append(0.0); continue
+            dists = distance.cdist([sample], self.centers, metric='euclidean')[0]
+            similarity = 1 / (dists**2 + 1e-6)
+            weights = similarity / np.sum(similarity)
+            local_preds = []
+            x_ext = np.insert(sample, 0, 1.0)
+            for theta in self.thetas:
+                local_preds.append(np.dot(theta, x_ext))
+            y_pred = max(0.0, np.sum(weights * np.array(local_preds)))
+            preds.append(y_pred)
+        return np.array(preds)
+
+# ==============================================================================
+#  CLASSE ENSEMBLE (500 MODELOS)
+# ==============================================================================
+class ALMMo_Ensemble:
+    def __init__(self, n_models=500, r_min=0.01, r_max=0.20): 
+        self.models = []
+        self.n_models = n_models
+        print(f">>> Inicializando Comitê com {n_models} modelos...")
+        for _ in range(n_models):
+            # Gera raio aleatório
+            raio_sorteado = random.uniform(r_min, r_max)
+            modelo = ALMMo1(raio_influencia=raio_sorteado)
+            self.models.append(modelo)
+    
+    def fit(self, X, y):
+        start_time = time.time()
+        print(f">>> Treinando {self.n_models} modelos...")
+        
+        for i, modelo in enumerate(self.models):
+            modelo.fit(X, y)
+            
+            if (i+1) % 50 == 0:
+                elapsed = time.time() - start_time
+                print(f"    Progresso: {i+1}/{self.n_models} ({elapsed:.1f}s)")
+    
+    def predict(self, X):
+        predictions_matrix = []
+        for modelo in self.models:
+            pred = modelo.predict(X)
+            predictions_matrix.append(pred)
+        return np.mean(predictions_matrix, axis=0)
+
+    def gerar_relatorio_csv(self, X_test, y_test, nome_arquivo='relatorio_modelos_ensemble.csv'):
+        dados_relatorio = []
+        
+        print(f"\n>>> Avaliando cada um dos {self.n_models} modelos individualmente...")
+        
+        for i, modelo in enumerate(self.models):
+            # Predição individual
+            y_pred = modelo.predict(X_test)
+            r2 = r2_score(y_test, y_pred)
+            modelo.r2_individual = r2 # Salva no objeto
+            
+            # Adiciona na lista
+            dados_relatorio.append({
+                'ID_Modelo': i+1,
+                'Raio': modelo.r,
+                'Num_Regras': modelo.n_rules,
+                'R2_Score': r2
+            })
+        
+        # Cria DataFrame e Salva
+        df_relatorio = pd.DataFrame(dados_relatorio)
+        df_relatorio.to_csv(nome_arquivo, index=False)
+        print(f"✅ Relatório salvo com sucesso: {nome_arquivo}")
+        print("-" * 60)
+        print("Resumo dos Dados Gerados:")
+        print(df_relatorio.describe()) # Mostra estatísticas (média, min, max)
+
+        return df_relatorio
+
+# ==============================================================================
+#  EXECUÇÃO
+# ==============================================================================
+arquivo_dataset = r'C:\Users\gabri\Documents\Projeto_2\dataset_imperatriz_ajustado_v3.csv'
+if not os.path.exists(arquivo_dataset):
+    print("Dataset não encontrado. Gerando dados sintéticos...")
+    X = np.random.rand(100, 4)
+    y = np.random.rand(100)
+else:
+    df = pd.read_csv(arquivo_dataset)
+    features = ['Tensao_Media_Atual_kPa', 'Chuva_Acumulada_3d_mm', 'Tmax_Futura_3d_C', 'DAP']
+    target = 'Irrigacao_mm'
+    X = df[features].values
+    y = df[target].values
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42, shuffle=True)
+
+# 1. Cria e Treina (500 Modelos)
+ensemble = ALMMo_Ensemble(n_models=500, r_min=0.01, r_max=0.20)
+ensemble.fit(X_train, y_train)
+
+# 2. Avalia o Ensemble Geral
+y_pred_ensemble = ensemble.predict(X_test)
+r2_ensemble = r2_score(y_test, y_pred_ensemble)
+print(f"\n>>> R² DO COMITÊ COMPLETO (Média das Predições): {r2_ensemble:.4f}")
+
+# 3. Gera o CSV Detalhado
+df_final = ensemble.gerar_relatorio_csv(X_test, y_test)
+
+# (Opcional) Plota um gráfico rápido para você ver a distribuição Raio vs R2
+plt.figure(figsize=(10, 5))
+plt.scatter(df_final['Raio'], df_final['R2_Score'], alpha=0.5, c='blue')
+plt.axhline(y=r2_ensemble, color='r', linestyle='--', label=f'Ensemble ({r2_ensemble:.3f})')
+plt.title('Impacto do Raio na Precisão (R²)')
+plt.xlabel('Raio de Influência')
+plt.ylabel('R² Score Individual')
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.show()

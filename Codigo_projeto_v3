@@ -123,9 +123,9 @@ arquivo_dataset = r'C:\Users\gabri\Documents\Projeto_2\dataset_imperatriz_ajusta
 if not os.path.exists(arquivo_dataset): exit("Dataset não encontrado!")
 
 df = pd.read_csv(arquivo_dataset)
-features = ['Tensao_Media_Atual_kPa', 'Chuva_Acumulada_3d_mm', 'Tmax_Futura_3d_C', 'DAP']
+features = ['Tensao_Media_Atual_kPa', 'Chuva_Acumulada_3d_mm', 'DAP']
 target = 'Irrigacao_mm'
-nomes_bonitos = ['Tensão (kPa)', 'Chuva (mm)', 'Temp (°C)', 'Idade (Dias)']
+nomes_bonitos = ['Tensão (kPa)', 'Chuva (mm)', 'Idade (Dias)']
 
 X = df[features].values
 y = df[target].values
@@ -147,19 +147,8 @@ print(f"R² (Precisão): {r2:.4f}")
 # ==============================================================================
 #  BLOCO 3: EXTRAÇÃO DE CONHECIMENTO (REGRAS)
 # ==============================================================================
-print("\n" + "="*70)
-print("             REGRAS (LÓGICA INTERNA)")
-print("="*70)
-indices = np.argsort(modelo.counts)[::-1] # Ordena das mais usadas para as menos
-for i in indices:
-    if modelo.counts[i] < 5: continue 
-    # Desnormaliza para mostrar valores reais (kPa, mm, °C)
-    c_real = modelo.centers[i] * (modelo.max_val - modelo.min_val) + modelo.min_val
-    print(f"REGRA #{i+1} (Baseada em {modelo.counts[i]} casos):")
-    print(f"  SE   Tensão ≈ {c_real[0]:.1f} kPa  E  Chuva ≈ {c_real[1]:.1f} mm")
-    print(f"  E    Temp   ≈ {c_real[2]:.1f} °C   E  Idade ≈ {c_real[3]:.0f} dias")
-    print(f"  -->  ENTÃO Calcular Irrigação Específica")
-    print("-" * 70)
+
+    
 
 # ==============================================================================
 #  BLOCO 4: OS 5 GRÁFICOS DO TCC
