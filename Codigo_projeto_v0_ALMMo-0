@@ -3,96 +3,69 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.spatial import distance
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import confusion_matrix, accuracy_score, classification_report
+from sklearn.metrics import confusion_matrix, accuracy_score, classification_report, mean_absolute_error
 import seaborn as sns
-import os
 import random
 import time
+import pickle
 
 # ==============================================================================
-#  CLASSE ALMMo-0 COM PODA (TÓPICO 2 + TÓPICO 5)
+#  1. CLASSES DO SISTEMA ALMMo-0
 # ==============================================================================
 class ALMMo0_Classifier_Pruning:
-    def __init__(self, raio_influencia=0.35, timeout=150):
+    def __init__(self, raio_influencia, timeout=150):
         self.r = raio_influencia
-        self.centers = []       
-        self.counts = []        
-        self.thetas = [] # Guarda a classe (0, 1, 2, 3, 4)
-        
-        # --- PODA DE REGRAS ---
-        self.last_usage = []      
-        self.timeout = timeout    
-        self.time_step = 0        
-        
-        self.n_rules = 0
-        self.min_val = None
-        self.max_val = None
+        self.centers, self.counts, self.thetas = [], [], []
+        self.last_usage, self.timeout, self.time_step = [], timeout, 0
+        self.n_rules, self.min_val, self.max_val = 0, None, None
 
     def _add_rule(self, x, class_target):
-        self.centers.append(x)
-        self.counts.append(1)
-        self.thetas.append(class_target) 
-        self.last_usage.append(self.time_step) # Regra nasce hoje
-        self.n_rules += 1
+        self.centers.append(x); self.counts.append(1); self.thetas.append(class_target)
+        self.last_usage.append(self.time_step); self.n_rules += 1
 
     def _update_rule(self, idx, x, class_target):
         k = self.counts[idx]
         self.centers[idx] = ((self.centers[idx] * k) + x) / (k + 1)
         self.counts[idx] += 1
-        
-        current_theta = self.thetas[idx]
-        self.thetas[idx] = ((current_theta * k) + class_target) / (k + 1)
-        
-        self.last_usage[idx] = self.time_step # Regra foi útil hoje!
+        self.thetas[idx] = ((self.thetas[idx] * k) + class_target) / (k + 1)
+        self.last_usage[idx] = self.time_step 
 
-    # --- O GARI (REMOÇÃO DE REGRAS OBSOLETAS) ---
+    # Mantemos esta função aqui para que ela seja exportada no .pkl para o campo
+    def retreinar_online(self, X_norm_sample, nova_classe_alvo):
+        if self.n_rules == 0: return
+        dists = distance.cdist([X_norm_sample], self.centers, metric='euclidean')[0]
+        nearest_idx = np.argmin(dists)
+        k, current_theta = self.counts[nearest_idx], self.thetas[nearest_idx]
+        self.thetas[nearest_idx] = ((current_theta * k) + nova_classe_alvo) / (k + 1)
+        self.last_usage[nearest_idx] = self.time_step
+
     def prune_old_rules(self):
-        indices_para_manter = []
-        for i in range(self.n_rules):
-            idade = self.time_step - self.last_usage[i]
-            if idade < self.timeout:
-                indices_para_manter.append(i)
-                
-        if len(indices_para_manter) < self.n_rules:
-            self.centers = [self.centers[i] for i in indices_para_manter]
-            self.counts = [self.counts[i] for i in indices_para_manter]
-            self.thetas = [self.thetas[i] for i in indices_para_manter]
-            self.last_usage = [self.last_usage[i] for i in indices_para_manter]
-            self.n_rules = len(indices_para_manter)
+        indices = [i for i in range(self.n_rules) if (self.time_step - self.last_usage[i]) < self.timeout]
+        if len(indices) < self.n_rules:
+            self.centers = [self.centers[i] for i in indices]
+            self.counts = [self.counts[i] for i in indices]
+            self.thetas = [self.thetas[i] for i in indices]
+            self.last_usage = [self.last_usage[i] for i in indices]
+            self.n_rules = len(indices)
 
     def fit(self, X, y):
-        X = np.array(X)
-        y = np.array(y)
+        X, y = np.array(X), np.array(y)
         if self.min_val is None:
-            self.min_val = X.min(axis=0)
-            self.max_val = X.max(axis=0)
-        denom = self.max_val - self.min_val
-        denom[denom == 0] = 1.0
+            self.min_val, self.max_val = X.min(axis=0), X.max(axis=0)
+        denom = np.where((self.max_val - self.min_val) == 0, 1.0, self.max_val - self.min_val)
         X_norm = (X - self.min_val) / denom
-        
         for i, sample in enumerate(X_norm):
             self.time_step += 1
-            target = y[i]
-            
-            if self.n_rules == 0:
-                self._add_rule(sample, target); continue
-            
+            if self.n_rules == 0: self._add_rule(sample, y[i]); continue
             dists = distance.cdist([sample], self.centers, metric='euclidean')[0]
             nearest_idx = np.argmin(dists)
-            
-            if dists[nearest_idx] > self.r:
-                self._add_rule(sample, target)
-            else:
-                self._update_rule(nearest_idx, sample, target)
-                
-            # Limpa regras velhas a cada 50 dias
-            if self.time_step % 50 == 0:
-                self.prune_old_rules()
+            if dists[nearest_idx] > self.r: self._add_rule(sample, y[i])
+            else: self._update_rule(nearest_idx, sample, y[i])
+            if self.time_step % 50 == 0: self.prune_old_rules()
 
     def predict(self, X):
         X = np.array(X)
-        denom = self.max_val - self.min_val
-        denom[denom == 0] = 1.0
+        denom = np.where((self.max_val - self.min_val) == 0, 1.0, self.max_val - self.min_val)
         X_norm = (X - self.min_val) / denom
         preds = []
         for sample in X_norm:
@@ -100,68 +73,55 @@ class ALMMo0_Classifier_Pruning:
             dists = distance.cdist([sample], self.centers, metric='euclidean')[0]
             similarity = 1 / (dists**2 + 1e-6)
             weights = similarity / np.sum(similarity)
-            pred_float = np.sum(weights * np.array(self.thetas))
-            # Arredonda para a classe mais próxima (0 a 4)
-            preds.append(int(round(pred_float)))
+            preds.append(int(round(np.sum(weights * np.array(self.thetas)))))
         return np.array(preds)
 
-# ==============================================================================
-#  COMITÊ ALMMo-0 (500 MODELOS COM PODA)
-# ==============================================================================
 class ALMMo0_Ensemble_Pruning:
-    def __init__(self, n_models=500, r_min=0.01, r_max=0.20): 
-        self.models = []
+    def __init__(self, n_models=1000, r_min=0.01, r_max=0.20): 
+        self.models = [ALMMo0_Classifier_Pruning(raio_influencia=random.uniform(r_min, r_max)) for _ in range(n_models)]
         self.n_models = n_models
-        print(f">>> Inicializando Comitê Classificador AUTO-LIMPANTE ({n_models} modelos)...")
-        for _ in range(n_models):
-            raio = random.uniform(r_min, r_max)
-            # Timeout de 150 dias para esquecer a regra
-            self.models.append(ALMMo0_Classifier_Pruning(raio_influencia=raio, timeout=150))
+        print(f">>> Inicializando Controlador Ensemble com {n_models} agentes...")
     
     def fit(self, X, y):
-        start_time = time.time()
+        start = time.time()
         for i, model in enumerate(self.models):
             model.fit(X, y)
-            if (i+1) % 100 == 0:
-                elapsed = time.time() - start_time
-                print(f"    Treinados: {i+1}/{self.n_models} ({elapsed:.1f}s)")
+            if (i+1) % 200 == 0: print(f"    Agentes Treinados: {i+1}/{self.n_models} ({time.time() - start:.1f}s)")
+                
+    # Função empacotada para rodar no campo
+    def retreinar_online(self, X_sample, nova_classe_alvo):
+        denom = np.where((self.models[0].max_val - self.models[0].min_val) == 0, 1.0, self.models[0].max_val - self.models[0].min_val)
+        X_norm = (X_sample - self.models[0].min_val) / denom
+        for model in self.models: model.retreinar_online(X_norm, nova_classe_alvo)
             
     def predict(self, X):
-        matrix_preds = []
-        for model in self.models:
-            matrix_preds.append(model.predict(X))
-        
-        # O Comitê vota! Tira a média dos 500 votos e arredonda para a classe final
-        mean_preds = np.mean(matrix_preds, axis=0)
-        return np.round(mean_preds).astype(int)
+        return np.round(np.mean([model.predict(X) for model in self.models], axis=0)).astype(int)
 
-    def gerar_relatorio_csv(self, X_test, y_test, nome_arquivo='relatorio_almmo0_poda.csv'):
-        dados = []
-        for i, modelo in enumerate(self.models):
-            y_pred = modelo.predict(X_test)
-            acc = accuracy_score(y_test, y_pred)
-            dados.append({
-                'ID': i+1, 'Raio': modelo.r, 'Regras_Finais': modelo.n_rules, 'Acuracia': acc
-            })
-        df = pd.DataFrame(dados)
-        df.to_csv(nome_arquivo, index=False)
-        print(f"\n✅ Relatório de auditoria salvo: '{nome_arquivo}'.")
-        print(f"Média de Regras por Modelo: {df['Regras_Finais'].mean():.1f}")
-        return df
 
 # ==============================================================================
-#  DADOS CRUS E EXECUÇÃO
+#  2. CARREGAMENTO DOS DADOS 
 # ==============================================================================
-arquivo_dataset = r'C:\Users\thiga\OneDrive\Documentos\Projeto 2\Projeto_2\dataset_imperatriz_ajustado_v3.csv'
-if not os.path.exists(arquivo_dataset):
-    print("ERRO: Dataset não encontrado!")
-    exit()
 
-df = pd.read_csv(arquivo_dataset)
+df = pd.read_csv('dataset_imperatriz_balanceado.csv', sep=None, engine='python')
+df.columns = df.columns.str.strip()
+
+print("\n>>> Gerando Matriz de Correlação de Pearson...")
+colunas_para_correlacao = ['Tensao_Media_Atual_kPa', 'Chuva_Acumulada_3d_mm', 'Tmax_Futura_3d_C', 'DAP', 'Irrigacao_mm']
+matriz_corr = df[colunas_para_correlacao].corr()
+
+plt.figure(figsize=(8, 6))
+sns.heatmap(matriz_corr, annot=True, cmap='coolwarm', fmt=".2f", vmin=-1, vmax=1)
+plt.title('Matriz de Correlação (Atributos vs Irrigação)')
+plt.tight_layout()
+plt.show() 
+
+
+# ==============================================================================
+#  3. PREPARAÇÃO E CATEGORIZAÇÃO
+# ==============================================================================
 features = ['Tensao_Media_Atual_kPa', 'Chuva_Acumulada_3d_mm', 'Tmax_Futura_3d_C', 'DAP']
-target = 'Irrigacao_mm'
 X_raw = df[features].values
-y_raw_mm = df[target].values
+y_raw_mm = df['Irrigacao_mm'].values
 
 def categorizar_irrigacao_5niveis(mm):
     if mm <= 0.1: return 0  
@@ -173,35 +133,47 @@ def categorizar_irrigacao_5niveis(mm):
 y_classes = np.array([categorizar_irrigacao_5niveis(val) for val in y_raw_mm])
 labels_map = {0:'M. Baixo', 1:'Baixo', 2:'Médio', 3:'Alto', 4:'M. Alto'}
 
-X_train, X_test, y_train, y_test = train_test_split(X_raw, y_classes, test_size=0.3, random_state=42, shuffle=True)
+X_train, X_test, y_train, y_test = train_test_split(X_raw, y_classes, test_size=0.3, random_state=42)
 
-# 1. Treina o Super Comitê
-ensemble = ALMMo0_Ensemble_Pruning(n_models=500, r_min=0.01, r_max=0.20)
+
+# ==============================================================================
+#  4. TREINAMENTO (COLD START) E MÉTRICAS AGRONÔMICAS
+# ==============================================================================
+print("\nIniciando fase de Cold Start (Treinamento em Laboratório)...")
+ensemble = ALMMo0_Ensemble_Pruning(n_models=1000, r_min=0.01, r_max=0.20)
 ensemble.fit(X_train, y_train)
 
-# 2. Avalia e Gera CSV
-y_pred = ensemble.predict(X_test)
-acc_final = accuracy_score(y_test, y_pred)
-cm = confusion_matrix(y_test, y_pred)
+y_pred_inicial = ensemble.predict(X_test)
 
-ensemble.gerar_relatorio_csv(X_test, y_test)
+acc_estrita = accuracy_score(y_test, y_pred_inicial)
+mae = mean_absolute_error(y_test, y_pred_inicial)
 
-# 3. Exibe Resultados
+
+erros_em_degraus = np.abs(y_test - y_pred_inicial)
+
+
 print("\n" + "="*60)
-print(f"RELATÓRIO: ENSEMBLE ALMMo-0 (500 Modelos + Poda)")
+print(f"RELATÓRIO DE DESEMPENHO - COLD START")
 print("="*60)
-print(f"Acurácia do Comitê: {acc_final:.4f} ({acc_final*100:.1f}%)")
+print(f"Acurácia Estrita: {acc_estrita*100:.1f}%")
+print(f"Erro Médio Absoluto (MAE): {mae:.4f} degraus\n")
 
-import warnings
-with warnings.catch_warnings():
-    warnings.simplefilter("ignore")
-    print(classification_report(y_test, y_pred, target_names=[labels_map[i] for i in sorted(np.unique(y_test))]))
+print(classification_report(y_test, y_pred_inicial, target_names=[labels_map[i] for i in sorted(np.unique(y_test))], zero_division=0))
 
+# Matriz de Confusão Inicial
 plt.figure(figsize=(8, 6))
-sns.heatmap(cm, annot=True, fmt='d', cmap='Oranges', 
+sns.heatmap(confusion_matrix(y_test, y_pred_inicial), annot=True, fmt='d', cmap='Oranges', 
             xticklabels=[labels_map[i] for i in sorted(np.unique(y_test))], 
             yticklabels=[labels_map[i] for i in sorted(np.unique(y_test))])
-plt.ylabel('Classe Real (AquaCrop)')
-plt.xlabel('Classe Predita (Comitê IA)')
-plt.title(f'Matriz de Confusão do Comitê ALMMo-0 (Acurácia: {acc_final*100:.1f}%)')
-plt.show()
+plt.ylabel('Classe de Referência (AquaCrop)')
+plt.xlabel('Classe Inferida (Modelo)')
+plt.title(f'Matriz de Confusão - Desempenho Inicial (Acc: {acc_estrita*100:.1f}%)')
+plt.show() 
+
+# ==============================================================================
+#  5. EXPORTANDO O MODELO
+# ==============================================================================
+print("\n>>> Exportando parâmetros do modelo ALMMo-0...")
+with open('modelo_almmo_imperatriz.pkl', 'wb') as f:
+    pickle.dump(ensemble, f)
+print("✅ Arquivo 'modelo_almmo_imperatriz.pkl' gerado com sucesso!")

@@ -9,7 +9,7 @@ import os
 import pickle
 
 # ==============================================================================
-#  BLOCO 1: A CLASSE DA IA (O CÉREBRO ALMMo-1)
+#  BLOCO 1: A CLASSE (O CÉREBRO ALMMo-1)
 # ==============================================================================
 class ALMMo1:
     def __init__(self, raio_influencia=0.05):
