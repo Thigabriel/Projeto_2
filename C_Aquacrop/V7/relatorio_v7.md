@@ -1,6 +1,5 @@
 # Relatorio de Validacao — dataset_cold_start_v7.csv
 
-**Data:** 2026-02-22 01:34
 **Amostras:** 2733
 **Limiar rotulagem:** 40.98 mm
 **Janelas:** chuva (Jan 5) + seca (Jun 1)
@@ -69,7 +68,7 @@
 - Corr tensao [+0.15,+0.7]: PASS (0.3693)
 - |Corr chuva| >= 0.10: PASS (0.1414)
 - Dias chuva>0 >= 100: PASS (2004)
-- Tensao C2>C0 (com shift): PASS (C0=17.6, C2=62.2 kPa)
+- Tensao C2>C0: PASS (C0=17.6, C2=62.2 kPa)
 - Sem NaN: PASS (0)
 - Tensao<1500: PASS (max=136.1)
 - Desvio padrao tensao >= 10: PASS (14.5)

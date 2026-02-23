@@ -720,6 +720,15 @@ def main():
     df_final.to_csv(csv_path, index=False)
     print(f"  dataset_cold_start_v7.csv ({len(df_final)} linhas)")
 
+    # Dataset completo (com cenario/janela) para gráficos de análise
+    cols_full = ['tensao_solo_kpa', 'chuva_acum_3d_mm', 'tmax_max_3d_c',
+                 'dap', 'classe_irrigacao', 'cenario', 'janela']
+    cols_full_exist = [c for c in cols_full if c in df_full.columns]
+    df_full_export = df_full[cols_full_exist].dropna(subset=['tensao_solo_kpa']).reset_index(drop=True)
+    full_path = OUTPUT_DIR / 'dataset_cold_start_v7_full.csv'
+    df_full_export.to_csv(full_path, index=False)
+    print(f"  dataset_cold_start_v7_full.csv ({len(df_full_export)} linhas, com cenario/janela)")
+
     report_path = OUTPUT_DIR / 'relatorio_v7.md'
     with open(report_path, 'w', encoding='utf-8') as f:
         f.write(report)
