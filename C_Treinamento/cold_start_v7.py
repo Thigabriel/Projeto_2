@@ -23,6 +23,11 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+#from imblearn.over_sampling import SMOTE
+from imblearn.combine import SMOTETomek 
+from collections import Counter
+from imblearn.over_sampling import ADASYN
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ALMMo-0 v2 (inline)
@@ -246,6 +251,19 @@ if __name__ == '__main__':
     # Check test has C1 and C2
     if (y_test == 1).sum() == 0 or (y_test == 2).sum() == 0:
         print("  ⚠ ALERTA: teste sem C1 ou C2 — ajustar grupos!")
+
+    # selmo
+    '''smote = SMOTETomek(random_state=42)
+    X_train, y_train = smote.fit_resample(X_train2, y_train2)
+    print(f"Antes SMOTE: treino={len(X_train2)}  classes={Counter(y_train2)}")
+    print(f"Após SMOTE: treino={len(X_train)}  classes={Counter(y_train)}")
+    print("Distribuição ORIGINAL do treino:", Counter(y_train2))
+    
+    adasyn = ADASYN(random_state=42)
+    X_train, y_train = adasyn.fit_resample(X_train2, y_train2)
+
+    print(f"Antes ADASYN: treino={len(X_train2)}  classes={Counter(y_train2)}")
+    print(f"Após ADASYN: treino={len(X_train)}  classes={Counter(y_train)}")'''
 
     # ── 3. BIDIMENSIONAL SWEEP ───────────────────────────────────────────
     sep("3. SWEEP BIDIMENSIONAL (r_threshold × min_rules_per_class)")
