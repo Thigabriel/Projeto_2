@@ -53,7 +53,7 @@ import seaborn as sns
 # ========================================================================
 
 # Caminho do dataset — único arquivo necessário
-DATASET_V7 = "dataset_cold_start_v7.csv"
+DATASET_V7 = "df_X_train_scaled(classe).csv"
 # O cenário binário (v7_bin) é gerado automaticamente a partir do v7,
 # fundindo classes 1 e 2 → classe 1 (irrigação necessária).
 

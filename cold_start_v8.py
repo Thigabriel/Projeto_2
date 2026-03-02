@@ -538,7 +538,7 @@ if __name__ == '__main__':
 
     # ── 1. LOAD ──────────────────────────────────────────────────────────
     sep("1. DATASET v7 (reutilizado como base para v8)")
-    df = pd.read_csv('dataset_cold_start_v7.csv')
+    df = pd.read_csv('df_X_train_scaled(classe).csv')
     fcols = ['tensao_solo_kpa', 'chuva_acum_3d_mm', 'tmax_max_3d_c', 'dap']
     X = df[fcols].values
     y = df['classe_irrigacao'].values
@@ -549,18 +549,30 @@ if __name__ == '__main__':
         print(f"  C{c}: {n:5d} ({n/len(y)*100:5.1f}%)")
 
     # ── 2. SPLIT (mesmo do v7) ───────────────────────────────────────────
-    sep("2. SPLIT (Leave-Groups-Out — mesmo do v7)")
+    sep("2. SPLIT (Leave-Groups-Out)")
+
     dap_vals = df['dap'].values
     resets = [0] + [i for i in range(1, len(dap_vals)) if dap_vals[i] < dap_vals[i-1]] + [len(dap_vals)]
-    test_group_ids = [5, 9, 13, 17, 21, 27]  # 0-indexed
+    n_groups = len(resets) - 1
+    print(f"  {n_groups} grupos detectados")
+
+# Ajuste dinâmico: seleciona apenas grupos que existem no dataset atual
+    potential_test_groups = [5, 9, 13, 17, 21, 23] 
+    test_group_ids = [g for g in potential_test_groups if g < n_groups]
+
     test_idx = []
     for g in test_group_ids:
         test_idx.extend(range(resets[g], resets[g+1]))
+
     train_idx = [i for i in range(len(df)) if i not in test_idx]
+
     X_train, y_train = X[train_idx], y[train_idx]
     X_test, y_test = X[test_idx], y[test_idx]
 
+    print(f"  Grupos de teste (0-indexed): {test_group_ids}")
     print(f"  Treino: {len(X_train)}  |  Teste: {len(X_test)}")
+
+# Mantendo a contagem de classes por split para conferência
     for c in range(3):
         print(f"  C{c}: treino={int((y_train==c).sum()):5d}  teste={int((y_test==c).sum()):4d}")
 
