@@ -1,0 +1,50 @@
+{
+  "localizacao": {
+    "nome": "Campo experimental",
+    "latitude": -5.5253,
+    "longitude": -47.4825,
+    "cidade": "Imperatriz",
+    "estado": "MA"
+  },
+  "plantio": {
+    "data_plantio": "2026-04-01",
+    "dap_maximo": 107,
+    "cultura": "Tomate"
+  },
+  "modelo": {
+    "pkl_ensemble": "memoria_cold_start_v12_ensemble.pkl",
+    "n_modelos": 14,
+    "nota": "pkl relativo a pasta pai (Projeto_2/)"
+  },
+  "irrigacao": {
+    "mm_C0": 0.0,
+    "mm_C1": 5.0,
+    "mm_C2": 15.0,
+    "bomba_vazao_lpm": 2.0,
+    "bomba_area_m2": 10.0,
+    "nota": "volume por classe em mm (1mm = 1L/m2). Tempo de bomba calculado automaticamente."
+  },
+  "arduino": {
+    "porta": "/dev/ttyUSB0",
+    "baudrate": 9600,
+    "timeout_s": 5,
+    "habilitado": false,
+    "protocolo": {
+      "solicitar_leitura": "LEITURA",
+      "prefixo_tensao": "TENSAO:",
+      "comando_bomba": "BOMBA:",
+      "separador_linha": "\n"
+    },
+    "nota": "Mudar habilitado para true quando Arduino estiver conectado. Porta pode variar: /dev/ttyUSB0 ou /dev/ttyACM0"
+  },
+  "nasa_power": {
+    "parametros": "T2M_MAX,PRECTOTCORR",
+    "community": "AG",
+    "timeout_s": 60
+  },
+  "sistema": {
+    "porta_flask": 5000,
+    "log_dias_maximo": 365,
+    "timezone": "America/Fortaleza"
+  }
+}

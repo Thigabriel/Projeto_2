@@ -5,15 +5,17 @@ Script de Simulacao AquaCrop-OSPy — Dataset v11 (Revisado)
 Projeto ALMMo-0 — Irrigacao Inteligente de Tomate | Imperatriz-MA
 ============================================================================
 
-Mudancas v11.1 vs v11:
-  1. Removido method 2 (intervalo) — irrigava independente do solo
-  2. Rotulagem em 3 classes agronomicas:
-     C0: sem irrigacao (< 2mm, inclui ruido numerico)
+Mudancas v11-revisado vs v11-original:
+  1. Limiar minimo de irrigacao: IrrDay < 2mm = ruido numerico -> C0
+  2. Rotulagem em 4 classes agronomicas (era 3 com mediana):
+     C0: sem irrigacao (< 2mm)
      C1: manutencao [2, 10) mm
-     C2: intensiva >= 10mm
-  3. Geracao de 6 graficos diagnosticos (matplotlib)
+     C2: suplementar [10, 30) mm
+     C3: intensiva >= 30mm
+  3. Intervalo method 2: 3 -> 5 dias (tensao std era 2.6 com 3)
+  4. Geracao de 6 graficos diagnosticos (matplotlib)
 
-Simulacoes: 23x3 (chuva) + 23x2 (seca) = 115
+Simulacoes: 23x4 (chuva) + 23x3 (seca) = 161
 
 Requisitos: pip install aquacrop pandas numpy requests matplotlib
 """
@@ -63,11 +65,13 @@ CENARIOS = {
                    'descricao':'SMT otimo (method 1) — irriga sob demanda'},
     'manutencao': {'method':4,'NetIrrSMT':70,
                    'descricao':'Manutencao (method 4) — net irrigation diaria, alvo 70% TAW'},
+    'intervalo':  {'method':2,'IrrInterval':5,
+                   'descricao':'Intervalo fixo (method 2) — a cada 5 dias'},
     'veranico':   {'method':1,'SMT':[60,60,70,50],'MaxIrr':100,'MaxIrrSeason':10000,
                    'descricao':'Veranico (method 1 + precip fev-mar x 0.20)'},
 }
-CENARIOS_CHUVA = ['smt_otimo','manutencao','veranico']
-CENARIOS_SECA  = ['smt_otimo','manutencao']
+CENARIOS_CHUVA = ['smt_otimo','manutencao','intervalo','veranico']
+CENARIOS_SECA  = ['smt_otimo','manutencao','intervalo']
 
 VERANICO_FATOR, VERANICO_MESES = 0.20, [2, 3]
 DAP_MIN, DAP_MAX, TR_MIN = 14, 107, 0.1
@@ -75,9 +79,10 @@ MAX_SIM_SECONDS = 120
 
 # Limiar minimo de irrigacao real (mm)
 IRR_MIN_MM = 2.0
-# Limiares 3 classes agronomicas
+# Limiares 4 classes agronomicas
 CLASSE_C1_MAX = 10.0
-NOMES_CLASSES = {0:'Sem irrigacao',1:'Manutencao',2:'Intensiva'}
+CLASSE_C2_MAX = 30.0
+NOMES_CLASSES = {0:'Sem irrigacao',1:'Manutencao',2:'Suplementar',3:'Intensiva'}
 
 OUTPUT_DIR = Path('.')
 WEATHER_DIR = Path('weather_files')
@@ -188,6 +193,7 @@ def build_irr_management(cn):
     c=CENARIOS[cn]; m=c['method']
     if m==1: return IrrigationManagement(irrigation_method=1,SMT=c['SMT'],MaxIrr=c['MaxIrr'],MaxIrrSeason=c['MaxIrrSeason'])
     if m==4: return IrrigationManagement(irrigation_method=4,NetIrrSMT=c['NetIrrSMT'])
+    if m==2: return IrrigationManagement(irrigation_method=2,IrrInterval=c['IrrInterval'])
     raise ValueError(f"Method {m}")
 
 def run_single_simulation(year, cenario_nome, janela, wdf_to_use):
@@ -282,17 +288,18 @@ def rotular_classes(df):
     def cls(v):
         if v<IRR_MIN_MM: return 0
         elif v<CLASSE_C1_MAX: return 1
-        else: return 2
+        elif v<CLASSE_C2_MAX: return 2
+        else: return 3
     df['classe_irrigacao']=df['IrrDay'].apply(cls)
     ruido=((df['IrrDay']>0)&(df['IrrDay']<IRR_MIN_MM)).sum()
     print(f"\n  Limiar: {IRR_MIN_MM}mm | Ruido->C0: {ruido} amostras")
-    print(f"  C0: <{IRR_MIN_MM}mm | C1: [{IRR_MIN_MM},{CLASSE_C1_MAX}) | C2: >={CLASSE_C1_MAX}mm")
+    print(f"  C0: <{IRR_MIN_MM}mm | C1: [{IRR_MIN_MM},{CLASSE_C1_MAX}) | C2: [{CLASSE_C1_MAX},{CLASSE_C2_MAX}) | C3: >={CLASSE_C2_MAX}mm")
     for cen in CENARIOS:
         for jan in ['chuva','seca']:
             s=df[(df['cenario']==cen)&(df['janela']==jan)]
             if len(s)>0:
                 vc=s['classe_irrigacao'].value_counts().sort_index()
-                print(f"  {cen}/{jan} (n={len(s)}): "+', '.join(f"C{c}={vc.get(c,0)}" for c in range(3)))
+                print(f"  {cen}/{jan} (n={len(s)}): "+', '.join(f"C{c}={vc.get(c,0)}" for c in range(4)))
     return df
 
 def build_final_dataset(df):
@@ -306,15 +313,15 @@ def build_final_dataset(df):
 # ============================================================================
 # MODULO 5: GRAFICOS
 # ============================================================================
-CC={0:'#2196F3',1:'#4CAF50',2:'#F44336'}
-LC={0:'C0: Sem irrigacao',1:'C1: Manutencao\n(2-10mm)',2:'C2: Intensiva\n(>=10mm)'}
+CC={0:'#2196F3',1:'#4CAF50',2:'#FF9800',3:'#F44336'}
+LC={0:'C0: Sem irrigacao',1:'C1: Manutencao\n(2-10mm)',2:'C2: Suplementar\n(10-30mm)',3:'C3: Intensiva\n(>30mm)'}
 
 def gerar_graficos(df_treino, df_full):
     if not HAS_MPL: print("  matplotlib indisponivel."); return
     print("  Gerando graficos...")
     plt.rcParams.update({'figure.facecolor':'white','axes.facecolor':'#FAFAFA',
                          'axes.grid':True,'grid.alpha':0.3,'font.size':10})
-    cls=[0,1,2]
+    cls=[0,1,2,3]
     vc=df_treino['classe_irrigacao'].value_counts().sort_index()
     vcp=df_treino['classe_irrigacao'].value_counts(normalize=True).sort_index()*100
     vals=[vc.get(c,0) for c in cls]; pcts=[vcp.get(c,0) for c in cls]
@@ -328,27 +335,28 @@ def gerar_graficos(df_treino, df_full):
                 f'{p:.1f}%\n({v})',ha='center',va='bottom',fontsize=9,fontweight='bold')
     ax.set_title('Distribuicao de Classes — v11',fontsize=13,fontweight='bold'); ax.set_ylabel('Amostras')
 
-    ax2=axes[1]; x=np.arange(3); w=0.3
-    ax2.bar(x-w,[94.1,4.1,1.8],w,label='v7',color='#90CAF9',edgecolor='white')
-    ax2.bar(x,pcts,w,label='v11',color='#FFCC80',edgecolor='white')
-    ax2.set_xticks(x); ax2.set_xticklabels(['C0','C1','C2'])
-    ax2.set_ylabel('%'); ax2.set_title('Evolucao v7 vs v11',fontsize=13,fontweight='bold'); ax2.legend()
+    ax2=axes[1]; x=np.arange(4); w=0.25
+    ax2.bar(x-w,[94.1,4.1,1.8,0],w,label='v7',color='#90CAF9',edgecolor='white')
+    ax2.bar(x,[94.9,3.4,1.7,0],w,label='v10',color='#A5D6A7',edgecolor='white')
+    ax2.bar(x+w,pcts,w,label='v11',color='#FFCC80',edgecolor='white')
+    ax2.set_xticks(x); ax2.set_xticklabels(['C0','C1','C2','C3'])
+    ax2.set_ylabel('%'); ax2.set_title('Evolucao v7 vs v10 vs v11',fontsize=13,fontweight='bold'); ax2.legend()
     plt.tight_layout(); fig.savefig(OUTPUT_DIR/'fig1_distribuicao_classes.png',dpi=150,bbox_inches='tight'); plt.close()
     print("    fig1_distribuicao_classes.png")
 
     # FIG 2: Contribuicao por metodo
-    fig,ax=plt.subplots(figsize=(10,6))
-    co=['smt_otimo','manutencao','veranico']
-    bottom=np.zeros(len(co))
+    fig,ax=plt.subplots(figsize=(12,6))
+    co=['smt_otimo','manutencao','intervalo','veranico']
+    bottom=np.zeros(4)
     for c in cls:
         vc2=[(df_full[df_full['cenario']==cn]['classe_irrigacao']==c).sum() for cn in co]
-        ax.bar(range(len(co)),vc2,bottom=bottom,label=LC[c],color=CC[c],edgecolor='white',linewidth=0.5)
+        ax.bar(range(4),vc2,bottom=bottom,label=LC[c],color=CC[c],edgecolor='white',linewidth=0.5)
         for i,(v,b) in enumerate(zip(vc2,bottom)):
             if v>50:
                 tot=len(df_full[df_full['cenario']==co[i]])
                 ax.text(i,b+v/2,f'{v/tot*100:.0f}%',ha='center',va='center',fontsize=8,color='white',fontweight='bold')
         bottom+=vc2
-    ax.set_xticks(range(len(co))); ax.set_xticklabels([f"{c}\n(method {CENARIOS[c]['method']})" for c in co],fontsize=9)
+    ax.set_xticks(range(4)); ax.set_xticklabels([f"{c}\n(method {CENARIOS[c]['method']})" for c in co],fontsize=9)
     ax.set_ylabel('Amostras'); ax.set_title('Contribuicao por Metodo',fontsize=13,fontweight='bold'); ax.legend(loc='upper right',fontsize=9)
     plt.tight_layout(); fig.savefig(OUTPUT_DIR/'fig2_metodos_por_classe.png',dpi=150,bbox_inches='tight'); plt.close()
     print("    fig2_metodos_por_classe.png")
@@ -372,11 +380,12 @@ def gerar_graficos(df_treino, df_full):
     ax=axes[0]
     ip=df_full[df_full['IrrDay']>=IRR_MIN_MM]['IrrDay']
     ax.hist(ip,bins=50,color='#5C6BC0',edgecolor='white',alpha=0.8)
-    for lim,cor,lb in [(IRR_MIN_MM,'red',f'Min={IRR_MIN_MM}mm'),(CLASSE_C1_MAX,'green',f'C1/C2={CLASSE_C1_MAX}mm')]:
+    for lim,cor,lb in [(IRR_MIN_MM,'red',f'Min={IRR_MIN_MM}mm'),(CLASSE_C1_MAX,'green',f'C1/C2={CLASSE_C1_MAX}mm'),
+                        (CLASSE_C2_MAX,'orange',f'C2/C3={CLASSE_C2_MAX}mm')]:
         ax.axvline(x=lim,color=cor,linestyle='--',linewidth=1.5,label=lb)
     ax.set_xlabel('Dose (mm)'); ax.set_ylabel('Freq'); ax.set_title('Doses >= 2mm',fontsize=13,fontweight='bold'); ax.legend(fontsize=9)
     ax2=axes[1]
-    cm={'smt_otimo':'#E53935','manutencao':'#43A047','veranico':'#FDD835'}
+    cm={'smt_otimo':'#E53935','manutencao':'#43A047','intervalo':'#1E88E5','veranico':'#FDD835'}
     for cn in co:
         s=df_full[(df_full['cenario']==cn)&(df_full['IrrDay']>=IRR_MIN_MM)]
         if len(s)>0: ax2.hist(s['IrrDay'],bins=30,alpha=0.5,label=cn,color=cm[cn],edgecolor='none')
@@ -395,10 +404,10 @@ def gerar_graficos(df_treino, df_full):
     plt.tight_layout(); fig.savefig(OUTPUT_DIR/'fig5_scatter_tensao_chuva.png',dpi=150,bbox_inches='tight'); plt.close()
     print("    fig5_scatter_tensao_chuva.png")
 
-    # FIG 6: Perfil temporal (2 metodos)
-    fig,axes=plt.subplots(2,1,figsize=(14,8),sharex=True)
+    # FIG 6: Perfil temporal
+    fig,axes=plt.subplots(3,1,figsize=(14,10),sharex=True)
     ano_ex=2005
-    for idx,cen in enumerate(['smt_otimo','manutencao']):
+    for idx,cen in enumerate(['smt_otimo','manutencao','intervalo']):
         ax=axes[idx]
         sub=df_full[(df_full['cenario']==cen)&(df_full['janela']=='seca')&(df_full['year']==ano_ex)]
         if len(sub)==0:
@@ -409,7 +418,7 @@ def gerar_graficos(df_treino, df_full):
         ax.plot(daps,tens,color='#5C6BC0',linewidth=1.5)
         ax.set_ylabel('Tensao (kPa)',color='#5C6BC0')
         ax2=ax.twinx()
-        cb=[('#E0E0E0' if v<IRR_MIN_MM else CC[1] if v<CLASSE_C1_MAX else CC[2]) for v in irr]
+        cb=[('#E0E0E0' if v<IRR_MIN_MM else CC[1] if v<CLASSE_C1_MAX else CC[2] if v<CLASSE_C2_MAX else CC[3]) for v in irr]
         ax2.bar(daps,irr,color=cb,alpha=0.7,width=0.8); ax2.set_ylabel('Irrigacao (mm)',color='#F44336')
         ax.set_title(f'{cen} (method {CENARIOS[cen]["method"]}) — seca {ano_ex}',fontsize=11,fontweight='bold')
     axes[-1].set_xlabel('DAP')
@@ -426,7 +435,7 @@ def validate_and_report(df_treino, df_full, weather_metas):
     r.append(f"**Data:** {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     r.append(f"**Amostras:** {len(df_treino)} | **Grupos:** {df_full['grupo_id'].nunique()}")
     r.append(f"**Periodo:** {min(ANOS)}-{max(ANOS)} ({len(ANOS)} anos)")
-    r.append(f"**Limiar ruido:** {IRR_MIN_MM}mm | **Classes:** C0/<{IRR_MIN_MM}, C1/[{IRR_MIN_MM},{CLASSE_C1_MAX}), C2/>={CLASSE_C1_MAX}mm")
+    r.append(f"**Limiar ruido:** {IRR_MIN_MM}mm | **Classes:** C0/<{IRR_MIN_MM}, C1/[{IRR_MIN_MM},{CLASSE_C1_MAX}), C2/[{CLASSE_C1_MAX},{CLASSE_C2_MAX}), C3/>={CLASSE_C2_MAX}mm")
     r.append(f"**Features:** tensao_solo_kpa, chuva_acum_3d_mm, tmax_max_3d_c, dap, delta_tensao_kpa\n")
 
     r.append("## Cenarios\n")
@@ -435,8 +444,8 @@ def validate_and_report(df_treino, df_full, weather_metas):
     r.append("\n## Distribuicao de Classes\n")
     vc=df_treino['classe_irrigacao'].value_counts().sort_index()
     vcp=df_treino['classe_irrigacao'].value_counts(normalize=True).sort_index()*100
-    for c in range(3): r.append(f"- {NOMES_CLASSES[c]} (C{c}): {vc.get(c,0)} ({vcp.get(c,0):.1f}%)")
-    r.append(f"\n**v7:** C0=94.1%, C1=4.1%, C2=1.8%")
+    for c in range(4): r.append(f"- {NOMES_CLASSES[c]} (C{c}): {vc.get(c,0)} ({vcp.get(c,0):.1f}%)")
+    r.append(f"\n**v7:** C0=94.1%, C1=4.1%, C2=1.8% | **v10:** C0=94.9%, C1=3.4%, C2=1.7%")
 
     r.append("\n### Por Cenario x Janela\n")
     for cn in CENARIOS:
@@ -445,13 +454,13 @@ def validate_and_report(df_treino, df_full, weather_metas):
             if len(s)>0:
                 vc2=s['classe_irrigacao'].value_counts().sort_index()
                 im=s.loc[s['IrrDay']>=IRR_MIN_MM,'IrrDay'].mean() if (s['IrrDay']>=IRR_MIN_MM).any() else 0
-                r.append(f"- {cn}/{jan} (n={len(s)}): "+', '.join(f"C{c}={vc2.get(c,0)}" for c in range(3))+f" | dose={im:.1f}mm")
+                r.append(f"- {cn}/{jan} (n={len(s)}): "+', '.join(f"C{c}={vc2.get(c,0)}" for c in range(4))+f" | dose={im:.1f}mm")
 
     r.append("\n### Por Metodo\n")
     for cn in CENARIOS:
         s=df_full[df_full['cenario']==cn]
         if len(s)>0:
-            parts=[f"C{c}={(s['classe_irrigacao']==c).mean()*100:.1f}%" for c in range(3)]
+            parts=[f"C{c}={(s['classe_irrigacao']==c).mean()*100:.1f}%" for c in range(4)]
             r.append(f"- {cn} (m{CENARIOS[cn]['method']}): {', '.join(parts)} | tensao std={s['tensao_solo_kpa'].std():.1f}")
 
     fc=['tensao_solo_kpa','chuva_acum_3d_mm','tmax_max_3d_c','dap','delta_tensao_kpa']
@@ -467,7 +476,7 @@ def validate_and_report(df_treino, df_full, weather_metas):
 
     r.append("\n## Tensao por Classe\n")
     tcls={}
-    for c in range(3):
+    for c in range(4):
         s=df_treino[df_treino['classe_irrigacao']==c]
         if len(s)>0:
             tcls[c]=s['tensao_solo_kpa'].median()
@@ -476,12 +485,12 @@ def validate_and_report(df_treino, df_full, weather_metas):
     r.append("\n## Criterios\n")
     res={}
     c0p=vcp.get(0,0); res['C0>=5%']=c0p>=5; r.append(f"- C0>=5%: {'PASS' if res['C0>=5%'] else 'FAIL'} ({c0p:.1f}%)")
-    c2p=vcp.get(2,0); res['C2>=0.5%']=c2p>=0.5; r.append(f"- C2>=0.5%: {'PASS' if res['C2>=0.5%'] else 'FAIL'} ({c2p:.1f}%)")
+    c3p=vcp.get(3,0); res['C3>=0.5%']=c3p>=0.5; r.append(f"- C3>=0.5%: {'PASS' if res['C3>=0.5%'] else 'FAIL'} ({c3p:.1f}%)")
     ct=corrs.get('tensao_solo_kpa',0); res['corr_t']=0.10<=ct<=0.7; r.append(f"- Corr tensao [0.10,0.70]: {'PASS' if res['corr_t'] else 'FAIL'} ({ct:.4f})")
     cc=abs(corrs.get('chuva_acum_3d_mm',0)); res['corr_c']=cc>=0.05; r.append(f"- |Corr chuva|>=0.05: {'PASS' if res['corr_c'] else 'FAIL'} ({cc:.4f})")
     d0=int((df_treino['chuva_acum_3d_mm']>0).sum()); res['chuva']=d0>=500; r.append(f"- Dias chuva>0>=500: {'PASS' if res['chuva'] else 'FAIL'} ({d0})")
-    to=all(tcls.get(c,0)<tcls.get(c+1,999) for c in range(2) if c+1 in tcls)
-    res['t_ord']=to; r.append(f"- Tensao C0<C1<C2: {'PASS' if to else 'FAIL'} ({', '.join(f'C{c}={tcls.get(c,0):.1f}' for c in range(3) if c in tcls)})")
+    to=all(tcls.get(c,0)<tcls.get(c+1,999) for c in range(3) if c+1 in tcls)
+    res['t_ord']=to; r.append(f"- Tensao C0<C1<C2<C3: {'PASS' if to else 'FAIL'} ({', '.join(f'C{c}={tcls.get(c,0):.1f}' for c in range(4) if c in tcls)})")
     nn=df_treino.isna().sum().sum(); res['nan']=nn==0; r.append(f"- Sem NaN: {'PASS' if res['nan'] else 'FAIL'} ({nn})")
     tm=df_treino['tensao_solo_kpa'].max(); res['t<1500']=tm<1500; r.append(f"- Tensao<1500: {'PASS' if res['t<1500'] else 'FAIL'} ({tm:.1f})")
     ts=df_treino['tensao_solo_kpa'].std(); res['t_std']=ts>=8; r.append(f"- Std tensao>=8: {'PASS' if res['t_std'] else 'FAIL'} ({ts:.1f})")
@@ -503,10 +512,10 @@ def validate_and_report(df_treino, df_full, weather_metas):
 def main():
     total=len(ANOS)*(len(CENARIOS_CHUVA)+len(CENARIOS_SECA))
     print("="*70)
-    print("AquaCrop-OSPy — Dataset v11.1")
+    print("AquaCrop-OSPy — Dataset v11 (Revisado)")
     print(f"Periodo: {min(ANOS)}-{max(ANOS)} | {total} simulacoes")
-    print(f"Metodos: 1(SMT), 4(net irr)")
-    print(f"Classes: C0/<{IRR_MIN_MM}mm, C1/[{IRR_MIN_MM},{CLASSE_C1_MAX}), C2/>={CLASSE_C1_MAX}mm")
+    print(f"Metodos: 1(SMT), 4(net irr), 2(intervalo 5d)")
+    print(f"Classes: C0/<{IRR_MIN_MM}mm, C1/[{IRR_MIN_MM},{CLASSE_C1_MAX}), C2/[{CLASSE_C1_MAX},{CLASSE_C2_MAX}), C3/>={CLASSE_C2_MAX}mm")
     print("="*70)
 
     print("\n[ETAPA 1] Simulacoes")
@@ -520,7 +529,7 @@ def main():
     processed = process_dataset(all_results)
     print(f"  Total: {len(processed)} amostras")
 
-    print("\n[ETAPA 3] Rotulagem (3 classes)")
+    print("\n[ETAPA 3] Rotulagem (4 classes)")
     processed = rotular_classes(processed)
 
     print("\n[ETAPA 4] Dataset Final")

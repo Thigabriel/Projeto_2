@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Irrigação Inteligente — ALMMo-0</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+  <style>
+    * { font-family:'Inter',sans-serif; }
+    body { background:#f1f5f9; }
+    .card { background:#fff; border-radius:16px; box-shadow:0 1px 4px rgba(0,0,0,.07),0 4px 16px rgba(0,0,0,.04); }
+    .section-title { font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:#94a3b8; margin-bottom:12px; }
+    .stat-val { font-size:1.9rem; font-weight:800; line-height:1; }
+    .stat-lbl { font-size:.7rem; font-weight:600; text-transform:uppercase; letter-spacing:.05em; color:#94a3b8; margin-top:5px; }
+    .badge { display:inline-flex; align-items:center; font-size:.7rem; font-weight:700; padding:3px 9px; border-radius:99px; }
+    .vote-bar { height:7px; border-radius:4px; transition:width .5s ease; }
+    .tension-bar { height:10px; border-radius:5px; background:linear-gradient(90deg,#22c55e 0%,#22c55e 40%,#f59e0b 40%,#f59e0b 60%,#ef4444 60%,#ef4444 100%); position:relative; }
+    .tension-marker { width:16px; height:16px; border-radius:50%; background:#1e293b; border:3px solid #fff; box-shadow:0 2px 6px rgba(0,0,0,.25); position:absolute; top:-3px; transform:translateX(-50%); transition:left .5s ease; }
+    .decision-card { border-radius:18px; transition:background .7s ease; }
+    .pulse { animation:pulse 2s infinite; }
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+    table { border-collapse:collapse; width:100%; }
+    thead th { font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:#64748b; padding:9px 11px; border-bottom:2px solid #f1f5f9; text-align:left; }
+    tbody td { font-size:.78rem; padding:9px 11px; border-bottom:1px solid #f8fafc; color:#334155; }
+    tbody tr:last-child td { border-bottom:none; }
+    tbody tr:hover td { background:#f8fafc; }
+    input[type=number]:focus { border-color:#1a7a4a!important; box-shadow:0 0 0 3px rgba(26,122,74,.15); }
+    ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:#f1f5f9}::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
+    .chart-wrap { position:relative; }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="bg-white border-b border-slate-200 sticky top-0 z-10">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-xl flex items-center justify-center text-white text-lg font-bold" style="background:#1a7a4a">🌱</div>
+      <div>
+        <div class="text-sm font-bold text-slate-800 leading-tight">Irrigação Inteligente</div>
+        <div class="text-xs text-slate-400 font-medium">ALMMo-0 v12 · Imperatriz-MA</div>
+      </div>
+    </div>
+    <div class="flex items-center gap-4">
+      <span id="api-dot" class="w-2 h-2 rounded-full bg-slate-300"></span>
+      <span id="api-lbl" class="text-xs text-slate-400 font-medium hidden sm:block">Conectando...</span>
+      <span id="next-upd" class="text-xs text-slate-400">—</span>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-4 py-5 space-y-4">
+
+  <!-- DECISÃO -->
+  <div id="dec-card" class="decision-card p-5 text-white" style="background:#1a7a4a">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div>
+        <div class="text-sm opacity-75 mb-1" id="dec-date">Carregando...</div>
+        <div class="text-4xl font-extrabold tracking-tight mb-2" id="dec-name">—</div>
+        <div class="flex flex-wrap gap-2">
+          <span class="badge bg-white bg-opacity-20 text-white" id="dec-dap">DAP —</span>
+          <span class="badge bg-white bg-opacity-20 text-white" id="dec-cons">Consenso —%</span>
+          <span class="badge bg-white bg-opacity-20 text-white" id="dec-votos">—</span>
+        </div>
+      </div>
+      <div class="text-center sm:text-right">
+        <div class="text-6xl font-extrabold" id="dec-mm">—</div>
+        <div class="text-sm opacity-75 mt-1">mm a irrigar</div>
+        <div class="text-sm opacity-90 mt-1" id="dec-bomba">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div class="card p-4">
+      <div class="stat-val text-slate-800" id="s-tensao">—</div>
+      <div class="stat-lbl">Tensão do Solo</div>
+      <div class="mt-3 tension-bar"><div class="tension-marker" id="tens-marker" style="left:33%"></div></div>
+      <div class="flex justify-between text-xs text-slate-400 mt-1"><span>0</span><span>75</span><span>150 kPa</span></div>
+    </div>
+    <div class="card p-4">
+      <div class="stat-val" id="s-delta" style="color:#1a7a4a">—</div>
+      <div class="stat-lbl">Delta Tensão</div>
+      <div class="text-xs text-slate-400 mt-2">variação desde ontem</div>
+    </div>
+    <div class="card p-4">
+      <div class="stat-val text-blue-500" id="s-chuva">—</div>
+      <div class="stat-lbl">Chuva (3 dias)</div>
+      <div class="text-xs text-slate-400 mt-2">acumulado mm</div>
+    </div>
+    <div class="card p-4">
+      <div class="stat-val text-orange-400" id="s-tmax">—</div>
+      <div class="stat-lbl">Tmax (3 dias)</div>
+      <div class="text-xs text-slate-400 mt-2">máxima °C</div>
+    </div>
+  </div>
+
+  <!-- ENSEMBLE + CONTROLES -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    <div class="card p-5">
+      <div class="section-title">Status do Ensemble</div>
+      <div class="flex items-end gap-3 mb-4">
+        <div class="text-4xl font-bold text-slate-800" id="ens-reg">—</div>
+        <div class="text-slate-400 text-sm mb-1">regras ativas</div>
+        <span class="badge ml-auto" style="background:#eff6ff;color:#1d4ed8" id="ens-mod">14 modelos</span>
+      </div>
+      <div class="space-y-2">
+        <div class="flex items-center gap-2"><span class="text-xs text-slate-500 w-6">C0</span><div class="flex-1 bg-slate-100 rounded-full h-2"><div id="bar-c0" class="vote-bar bg-emerald-400" style="width:0%"></div></div><span class="text-xs text-slate-500 w-6 text-right" id="lbl-c0">—</span></div>
+        <div class="flex items-center gap-2"><span class="text-xs text-slate-500 w-6">C1</span><div class="flex-1 bg-slate-100 rounded-full h-2"><div id="bar-c1" class="vote-bar bg-amber-400" style="width:0%"></div></div><span class="text-xs text-slate-500 w-6 text-right" id="lbl-c1">—</span></div>
+        <div class="flex items-center gap-2"><span class="text-xs text-slate-500 w-6">C2</span><div class="flex-1 bg-slate-100 rounded-full h-2"><div id="bar-c2" class="vote-bar bg-red-400" style="width:0%"></div></div><span class="text-xs text-slate-500 w-6 text-right" id="lbl-c2">—</span></div>
+      </div>
+      <div class="text-xs text-slate-400 mt-3" id="ens-upd">—</div>
+    </div>
+    <div class="card p-5">
+      <div class="section-title">Arduino & Controles</div>
+      <div class="mb-3 flex items-center justify-between">
+        <span class="text-sm text-slate-600">Status Arduino</span>
+        <span id="ard-badge" class="badge bg-slate-100 text-slate-400">Verificando...</span>
+      </div>
+      <div class="mb-4">
+        <label class="text-xs font-semibold text-slate-500 uppercase tracking-wide block mb-1">Tensão manual (kPa)</label>
+        <div class="flex gap-2">
+          <input id="inp-tensao" type="number" min="1" max="1500" step="0.1" placeholder="Ex: 52.5"
+            class="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 outline-none transition"/>
+          <button onclick="salvarTensao()" class="px-4 py-2 rounded-lg text-sm font-semibold text-white hover:opacity-90 active:scale-95 transition" style="background:#1a7a4a">Salvar</button>
+        </div>
+        <div id="fb-tensao" class="text-xs mt-1 min-h-[16px] text-slate-400"></div>
+      </div>
+      <div class="flex gap-2 flex-wrap">
+        <button onclick="executar(false)" id="btn-exec" class="flex-1 py-2 rounded-lg text-sm font-semibold text-white hover:opacity-90 active:scale-95 transition" style="background:#1a7a4a">▶ Executar Agora</button>
+        <button onclick="executar(true)" class="px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition active:scale-95">🧪 Teste</button>
+      </div>
+      <div id="fb-exec" class="text-xs mt-2 min-h-[16px] text-slate-400"></div>
+    </div>
+  </div>
+
+  <!-- GRÁFICO 1: TENSÃO COM BANDAS -->
+  <div class="card p-5">
+    <div class="section-title">Tensão do Solo — Histórico com Zonas Agronômicas</div>
+    <div class="chart-wrap" style="height:220px"><canvas id="ch-tensao"></canvas></div>
+    <div class="flex gap-4 mt-3 text-xs text-slate-400">
+      <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:rgba(34,197,94,.2)"></span>Ótimo (0–60 kPa)</span>
+      <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:rgba(245,158,11,.2)"></span>Atenção (60–90 kPa)</span>
+      <span class="flex items-center gap-1"><span class="inline-block w-3 h-3 rounded-sm" style="background:rgba(239,68,68,.2)"></span>Estresse (&gt;90 kPa)</span>
+    </div>
+  </div>
+
+  <!-- GRÁFICO 2+3: DELTA + CONSENSO -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    <div class="card p-5">
+      <div class="section-title">Delta de Tensão Diário (kPa)</div>
+      <div class="chart-wrap" style="height:180px"><canvas id="ch-delta"></canvas></div>
+      <div class="text-xs text-slate-400 mt-2">Positivo = solo secando · Negativo = solo umedecendo</div>
+    </div>
+    <div class="card p-5">
+      <div class="section-title">Consenso do Ensemble (%)</div>
+      <div class="chart-wrap" style="height:180px"><canvas id="ch-cons"></canvas></div>
+      <div class="text-xs text-slate-400 mt-2">Acima de 70% = decisão confiante</div>
+    </div>
+  </div>
+
+  <!-- GRÁFICO 4: CHUVA VS IRRIGAÇÃO -->
+  <div class="card p-5">
+    <div class="section-title">Chuva (3d acum.) vs. Volume Irrigado (mm/dia)</div>
+    <div class="chart-wrap" style="height:200px"><canvas id="ch-chuva-irr"></canvas></div>
+  </div>
+
+  <!-- GRÁFICO 5+6: IRRIGAÇÃO ACUMULADA + EVOLUÇÃO DE REGRAS -->
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    <div class="card p-5">
+      <div class="section-title">Volume de Irrigação por Dia (mm)</div>
+      <div class="chart-wrap" style="height:180px"><canvas id="ch-irr"></canvas></div>
+    </div>
+    <div class="card p-5">
+      <div class="section-title">Evolução de Regras por Classe (ALMMo-0)</div>
+      <div class="chart-wrap" style="height:180px"><canvas id="ch-regras"></canvas></div>
+      <div class="text-xs text-slate-400 mt-2">Mostra o aprendizado online — regras criadas e podadas</div>
+    </div>
+  </div>
+
+  <!-- GRÁFICO 7+8: DISTRIBUIÇÃO + DAP -->
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+    <div class="card p-5 flex flex-col">
+      <div class="section-title">Distribuição de Decisões</div>
+      <div class="chart-wrap flex-1" style="height:180px"><canvas id="ch-dist"></canvas></div>
+    </div>
+    <div class="card p-5 sm:col-span-2">
+      <div class="section-title">Decisões por Fase do Ciclo (DAP)</div>
+      <div class="chart-wrap" style="height:180px"><canvas id="ch-dap"></canvas></div>
+    </div>
+  </div>
+
+  <!-- LOG -->
+  <div class="card p-5">
+    <div class="flex items-center justify-between mb-3">
+      <div class="section-title mb-0">Log de Decisões</div>
+      <span id="log-cnt" class="text-xs text-slate-400">—</span>
+    </div>
+    <div class="overflow-x-auto -mx-5 px-5">
+      <table>
+        <thead><tr>
+          <th>Data</th><th>DAP</th><th>Tensão</th><th>Delta</th>
+          <th>Chuva 3d</th><th>Decisão</th><th>Irrigar</th><th>Consenso</th>
+        </tr></thead>
+        <tbody id="log-body"><tr><td colspan="8" class="text-center text-slate-400 py-6">Carregando...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<script>
+const API = '';
+const COR = {'0':'#22c55e','1':'#f59e0b','2':'#ef4444'};
+const COR_BG = {'0':'rgba(34,197,94,.15)','1':'rgba(245,158,11,.15)','2':'rgba(239,68,68,.15)'};
+const NOME = {'0':'C0 Sem Irrig.','1':'C1 Manut.','2':'C2 Intensiva'};
+
+// ── Plugin de bandas agronômicas ─────────────────────────────────────────
+const bandPlugin = {
+  id:'agro-bands',
+  beforeDraw(chart){
+    const {ctx,chartArea,scales} = chart;
+    if(!chartArea||!scales.y) return;
+    const {top,left,right} = chartArea;
+    const y = scales.y;
+    const safe = (v) => Math.max(top, Math.min(chartArea.bottom, y.getPixelForValue(v)));
+    // Ótimo: 0–60
+    ctx.fillStyle='rgba(34,197,94,.09)';
+    ctx.fillRect(left, safe(60), right-left, safe(0)-safe(60));
+    // Atenção: 60–90
+    ctx.fillStyle='rgba(245,158,11,.09)';
+    ctx.fillRect(left, safe(90), right-left, safe(60)-safe(90));
+    // Estresse: 90+
+    ctx.fillStyle='rgba(239,68,68,.09)';
+    ctx.fillRect(left, top, right-left, safe(90)-top);
+  }
+};
+Chart.register(bandPlugin);
+
+// ── Linha de referência nos 70% ──────────────────────────────────────────
+const refPlugin = {
+  id:'ref-line',
+  beforeDraw(chart){
+    const {ctx,chartArea,scales} = chart;
+    if(!chartArea||!scales.y) return;
+    const y70 = scales.y.getPixelForValue(70);
+    if(y70 < chartArea.top || y70 > chartArea.bottom) return;
+    ctx.save();
+    ctx.setLineDash([5,4]);
+    ctx.strokeStyle='rgba(148,163,184,.5)';
+    ctx.lineWidth=1;
+    ctx.beginPath();
+    ctx.moveTo(chartArea.left, y70);
+    ctx.lineTo(chartArea.right, y70);
+    ctx.stroke();
+    ctx.restore();
+  }
+};
+
+// ── Helpers ──────────────────────────────────────────────────────────────
+const opts = (extra={}) => ({
+  responsive:true, maintainAspectRatio:false,
+  plugins:{legend:{display:false},...extra.plugins},
+  scales:{
+    x:{grid:{display:false}, ticks:{font:{size:10},color:'#94a3b8', maxTicksLimit:10}},
+    y:{grid:{color:'#f1f5f9'}, ticks:{font:{size:10},color:'#94a3b8'}}
+  },
+  ...extra
+});
+
+// ── Inicializa gráficos ──────────────────────────────────────────────────
+const chTensao = new Chart(document.getElementById('ch-tensao'),{
+  type:'line',
+  data:{labels:[],datasets:[{label:'Tensão (kPa)',data:[],borderColor:'#1a7a4a',backgroundColor:'rgba(26,122,74,.07)',borderWidth:2,pointRadius:3,pointBackgroundColor:'#1a7a4a',fill:true,tension:.3}]},
+  options: opts({scales:{x:{grid:{display:false},ticks:{font:{size:10},color:'#94a3b8',maxTicksLimit:10}},y:{min:0,max:160,grid:{color:'#f1f5f9'},ticks:{font:{size:10},color:'#94a3b8'}}}})
+});
+
+const chDelta = new Chart(document.getElementById('ch-delta'),{
+  type:'bar',
+  data:{labels:[],datasets:[{label:'Delta (kPa)',data:[],backgroundColor:[],borderRadius:4}]},
+  options: opts({scales:{x:{grid:{display:false},ticks:{font:{size:10},color:'#94a3b8',maxTicksLimit:10}},y:{grid:{color:'#f1f5f9'},ticks:{font:{size:10},color:'#94a3b8'}}}})
+});
+
+const chCons = new Chart(document.getElementById('ch-cons'),{
+  type:'line',
+  data:{labels:[],datasets:[{label:'Consenso (%)',data:[],borderColor:'#6366f1',backgroundColor:'rgba(99,102,241,.08)',borderWidth:2,pointRadius:3,fill:true,tension:.3}]},
+  options: opts({plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:10},color:'#94a3b8',maxTicksLimit:10}},y:{min:0,max:100,grid:{color:'#f1f5f9'},ticks:{font:{size:10},color:'#94a3b8', callback:v=>v+'%'}}},extraPlugins:[refPlugin]})
+});
+// Registra plugin de linha de referência só no gráfico de consenso
+Chart.register({...refPlugin, beforeDraw(chart){ if(chart.canvas.id==='ch-cons') refPlugin.beforeDraw(chart); }});
+
+const chChuvaIrr = new Chart(document.getElementById('ch-chuva-irr'),{
+  type:'bar',
+  data:{labels:[],datasets:[
+    {label:'Chuva 3d (mm)',data:[],backgroundColor:'rgba(59,130,246,.5)',borderRadius:3},
+    {label:'Irrigação (mm)',data:[],backgroundColor:[],borderRadius:3},
+  ]},
+  options: opts({plugins:{legend:{display:true,labels:{font:{size:11},color:'#64748b',boxWidth:12}}},scales:{x:{grid:{display:false},ticks:{font:{size:10},color:'#94a3b8',maxTicksLimit:10}},y:{grid:{color:'#f1f5f9'},ticks:{font:{size:10},color:'#94a3b8'}}}})
+});
+
+const chIrr = new Chart(document.getElementById('ch-irr'),{
+  type:'bar',
+  data:{labels:[],datasets:[{label:'Irrigação (mm)',data:[],backgroundColor:[],borderRadius:4}]},
+  options: opts({scales:{x:{grid:{display:false},ticks:{font:{size:10},color:'#94a3b8',maxTicksLimit:10}},y:{grid:{color:'#f1f5f9'},ticks:{font:{size:10},color:'#94a3b8'}}}})
+});
+
+const chRegras = new Chart(document.getElementById('ch-regras'),{
+  type:'line',
+  data:{labels:[],datasets:[
+    {label:'C0',data:[],borderColor:'#22c55e',backgroundColor:'transparent',borderWidth:2,pointRadius:2,tension:.3},
+    {label:'C1',data:[],borderColor:'#f59e0b',backgroundColor:'transparent',borderWidth:2,pointRadius:2,tension:.3},
+    {label:'C2',data:[],borderColor:'#ef4444',backgroundColor:'transparent',borderWidth:2,pointRadius:2,tension:.3},
+  ]},
+  options: opts({plugins:{legend:{display:true,labels:{font:{size:11},color:'#64748b',boxWidth:12}}},scales:{x:{grid:{display:false},ticks:{font:{size:10},color:'#94a3b8',maxTicksLimit:10}},y:{grid:{color:'#f1f5f9'},ticks:{font:{size:10},color:'#94a3b8'}}}})
+});
+
+const chDist = new Chart(document.getElementById('ch-dist'),{
+  type:'doughnut',
+  data:{labels:['C0 Sem Irrig.','C1 Manut.','C2 Intensiva'],datasets:[{data:[0,0,0],backgroundColor:['#22c55e','#f59e0b','#ef4444'],borderWidth:2,borderColor:'#fff'}]},
+  options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:'bottom',labels:{font:{size:11},color:'#64748b',boxWidth:12,padding:8}}}}
+});
+
+const chDap = new Chart(document.getElementById('ch-dap'),{
+  type:'bar',
+  data:{labels:['DAP 14–30','DAP 31–55','DAP 56–80','DAP 81–107'],datasets:[
+    {label:'C0',data:[0,0,0,0],backgroundColor:'rgba(34,197,94,.7)',borderRadius:4},
+    {label:'C1',data:[0,0,0,0],backgroundColor:'rgba(245,158,11,.7)',borderRadius:4},
+    {label:'C2',data:[0,0,0,0],backgroundColor:'rgba(239,68,68,.7)',borderRadius:4},
+  ]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,labels:{font:{size:11},color:'#64748b',boxWidth:12}}},
+    scales:{x:{grid:{display:false},ticks:{font:{size:11},color:'#94a3b8'}},y:{grid:{color:'#f1f5f9'},ticks:{font:{size:10},color:'#94a3b8'},title:{display:true,text:'Dias',color:'#94a3b8',font:{size:10}}}}}
+});
+
+// ── Atualiza status (30s) ─────────────────────────────────────────────────
+async function atualizarStatus(){
+  try{
+    const d = await fetch(`${API}/api/status`).then(r=>r.json());
+    // API dot
+    document.getElementById('api-dot').className='w-2 h-2 rounded-full bg-emerald-400';
+    document.getElementById('api-lbl').textContent='API Online';
+    // Decisão
+    document.getElementById('dec-card').style.background = d.cor_classe||'#475569';
+    document.getElementById('dec-name').textContent = d.nome_classe||'—';
+    document.getElementById('dec-date').textContent = d.data||'Aguardando primeiro ciclo';
+    document.getElementById('dec-mm').textContent = d.mm_irrigar??'—';
+    document.getElementById('dec-dap').textContent = d.dap!=null?`DAP ${d.dap} dias`:'DAP —';
+    document.getElementById('dec-cons').textContent = d.consenso_pct!=null?`${d.consenso_pct}% consenso`:'—';
+    document.getElementById('dec-bomba').textContent = d.tempo_bomba_s?`Bomba: ${(d.tempo_bomba_s/60).toFixed(1)} min`:'';
+    const votos=d.votos||{};
+    document.getElementById('dec-votos').textContent = Object.entries(votos).map(([k,v])=>['C0','C1','C2'][k]+':'+v).join(' · ')||'—';
+    // Stats
+    document.getElementById('s-tensao').textContent = d.tensao_kpa!=null?d.tensao_kpa.toFixed(1)+' kPa':'—';
+    const dv=parseFloat(d.delta_kpa);
+    document.getElementById('s-delta').textContent = isNaN(dv)?'—':(dv>=0?'+':'')+dv.toFixed(2)+' kPa';
+    document.getElementById('s-delta').style.color = isNaN(dv)?'#475569':dv>0?'#ef4444':'#1a7a4a';
+    document.getElementById('s-chuva').textContent = d.chuva_3d_mm!=null?d.chuva_3d_mm+' mm':'—';
+    document.getElementById('s-tmax').textContent  = d.tmax_3d_c!=null?d.tmax_3d_c+' °C':'—';
+    // Barra tensão
+    if(d.tensao_kpa!=null) document.getElementById('tens-marker').style.left=Math.min(Math.max(d.tensao_kpa/150*100,0),100)+'%';
+    // Ensemble
+    document.getElementById('ens-reg').textContent = d.n_regras??'—';
+    document.getElementById('ens-mod').textContent = `${d.n_modelos??14} modelos`;
+    document.getElementById('ens-upd').textContent = d.ultima_atualizacao?'Atualizado: '+d.ultima_atualizacao:'—';
+    const rc=d.regras_por_classe||{};
+    const totR=(rc[0]||0)+(rc[1]||0)+(rc[2]||0)||1;
+    ['0','1','2'].forEach(c=>{
+      document.getElementById(`bar-c${c}`).style.width=((rc[c]||0)/totR*100).toFixed(0)+'%';
+      document.getElementById(`lbl-c${c}`).textContent=rc[c]||0;
+    });
+    // Arduino
+    const ab=document.getElementById('ard-badge');
+    if(d.arduino_habilitado){ ab.textContent=d.arduino_bomba_ok===true?'✅ Arduino OK':'🔌 Arduino Ativo'; ab.style.background='#f0fdf4'; ab.style.color='#16a34a'; }
+    else{ ab.textContent='⌨ Entrada Manual'; ab.style.background='#f1f5f9'; ab.style.color='#64748b'; }
+  }catch(e){
+    document.getElementById('api-dot').className='w-2 h-2 rounded-full bg-red-400 pulse';
+    document.getElementById('api-lbl').textContent='API Offline';
+  }
+}
+
+// ── Atualiza gráficos (60s) ───────────────────────────────────────────────
+async function atualizarGraficos(){
+  try{
+    const rows = await fetch(`${API}/api/historico?n=120`).then(r=>r.json());
+    if(!Array.isArray(rows)||rows.length===0) return;
+
+    const sorted = [...rows].reverse(); // cronológico para gráficos de linha
+    const labels = sorted.map(r=>r.data.slice(5));
+
+    // ── 1. Tensão com bandas
+    chTensao.data.labels=labels;
+    chTensao.data.datasets[0].data=sorted.map(r=>parseFloat(r.tensao_kpa)||0);
+    chTensao.update('none');
+
+    // ── 2. Delta diário
+    const deltas=sorted.map(r=>parseFloat(r.delta_kpa)||0);
+    chDelta.data.labels=labels;
+    chDelta.data.datasets[0].data=deltas;
+    chDelta.data.datasets[0].backgroundColor=deltas.map(v=>v>=0?'rgba(239,68,68,.6)':'rgba(34,197,94,.6)');
+    chDelta.update('none');
+
+    // ── 3. Consenso
+    chCons.data.labels=labels;
+    chCons.data.datasets[0].data=sorted.map(r=>parseFloat(r.consenso_pct)||0);
+    chCons.update('none');
+
+    // ── 4. Chuva vs Irrigação
+    const irrCores=sorted.map(r=>COR_BG[r.classe]||'rgba(100,116,139,.15)');
+    chChuvaIrr.data.labels=labels;
+    chChuvaIrr.data.datasets[0].data=sorted.map(r=>parseFloat(r.chuva_3d_mm)||0);
+    chChuvaIrr.data.datasets[1].data=sorted.map(r=>parseFloat(r.mm_irrigar)||0);
+    chChuvaIrr.data.datasets[1].backgroundColor=irrCores;
+    chChuvaIrr.update('none');
+
+    // ── 5. Irrigação diária
+    chIrr.data.labels=labels;
+    chIrr.data.datasets[0].data=sorted.map(r=>parseFloat(r.mm_irrigar)||0);
+    chIrr.data.datasets[0].backgroundColor=sorted.map(r=>COR[r.classe]||'#94a3b8');
+    chIrr.update('none');
+
+    // ── 6. Evolução de regras por classe
+    chRegras.data.labels=labels;
+    chRegras.data.datasets[0].data=sorted.map(r=>parseInt(r.regras_c0)||0);
+    chRegras.data.datasets[1].data=sorted.map(r=>parseInt(r.regras_c1)||0);
+    chRegras.data.datasets[2].data=sorted.map(r=>parseInt(r.regras_c2)||0);
+    chRegras.update('none');
+
+    // ── 7. Distribuição de decisões (donut)
+    const cnt={0:0,1:0,2:0};
+    rows.forEach(r=>{ const c=parseInt(r.classe); if(c>=0&&c<=2) cnt[c]++; });
+    chDist.data.datasets[0].data=[cnt[0],cnt[1],cnt[2]];
+    chDist.update('none');
+
+    // ── 8. Decisões por fase do DAP
+    const faixas=[[14,30],[31,55],[56,80],[81,107]];
+    const dapCnt=faixas.map(()=>({0:0,1:0,2:0}));
+    rows.forEach(r=>{
+      const dap=parseInt(r.dap), c=parseInt(r.classe);
+      faixas.forEach((f,i)=>{ if(dap>=f[0]&&dap<=f[1]&&c>=0&&c<=2) dapCnt[i][c]++; });
+    });
+    chDap.data.datasets[0].data=dapCnt.map(d=>d[0]);
+    chDap.data.datasets[1].data=dapCnt.map(d=>d[1]);
+    chDap.data.datasets[2].data=dapCnt.map(d=>d[2]);
+    chDap.update('none');
+
+    // ── Tabela de log
+    document.getElementById('log-cnt').textContent=`${rows.length} registros`;
+    document.getElementById('log-body').innerHTML=rows.map(r=>{
+      const c=r.classe, dv=parseFloat(r.delta_kpa);
+      const dStr=isNaN(dv)?'—':(dv>=0?'+':'')+dv.toFixed(2);
+      const dCol=isNaN(dv)?'':'color:'+(dv>=0?'#ef4444':'#16a34a');
+      return `<tr>
+        <td class="font-medium">${r.data}</td>
+        <td>${r.dap}</td>
+        <td>${parseFloat(r.tensao_kpa).toFixed(1)} kPa</td>
+        <td style="${dCol}">${dStr} kPa</td>
+        <td>${r.chuva_3d_mm} mm</td>
+        <td><span class="badge" style="background:${COR_BG[c]||'#f1f5f9'};color:${COR[c]||'#64748b'}">${r.nome_classe||'—'}</span></td>
+        <td>${r.mm_irrigar} mm</td>
+        <td>${r.consenso_pct}%</td>
+      </tr>`;
+    }).join('');
+  }catch(e){/*silencioso*/}
+}
+
+// ── Ações ─────────────────────────────────────────────────────────────────
+async function salvarTensao(){
+  const val=parseFloat(document.getElementById('inp-tensao').value);
+  const fb=document.getElementById('fb-tensao');
+  if(isNaN(val)||val<=0){fb.textContent='⚠ Informe um valor válido.';fb.style.color='#ef4444';return;}
+  try{
+    const d=await fetch(`${API}/api/tensao`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tensao_kpa:val})}).then(r=>r.json());
+    fb.textContent=d.status==='ok'?`✅ ${d.mensagem}`:`❌ ${d.erro||'Erro'}`;
+    fb.style.color=d.status==='ok'?'#16a34a':'#ef4444';
+    if(d.status==='ok') document.getElementById('inp-tensao').value='';
+  }catch(e){fb.textContent='❌ Falha de conexão.';fb.style.color='#ef4444';}
+}
+
+async function executar(teste=false){
+  const fb=document.getElementById('fb-exec'), btn=document.getElementById('btn-exec');
+  btn.textContent='⏳ Iniciando...'; btn.disabled=true;
+  try{
+    const d=await fetch(`${API}/api/executar`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({modo_teste:teste})}).then(r=>r.json());
+    fb.textContent=d.status==='iniciado'?`🚀 ${d.mensagem}`:`❌ ${d.mensagem||'Erro'}`;
+    fb.style.color=d.status==='iniciado'?'#1a7a4a':'#ef4444';
+    if(d.status==='iniciado') setTimeout(()=>{atualizarStatus();atualizarGraficos();},15000);
+  }catch(e){fb.textContent='❌ Falha de conexão.';fb.style.color='#ef4444';}
+  btn.textContent='▶ Executar Agora'; btn.disabled=false;
+}
+
+// ── Loop ──────────────────────────────────────────────────────────────────
+let tStatus=30, tGraf=60;
+function tick(){
+  if(--tStatus<=0){atualizarStatus();tStatus=30;}
+  if(--tGraf<=0){atualizarGraficos();tGraf=60;}
+  document.getElementById('next-upd').textContent=`Atualiza em ${tStatus}s`;
+}
+
+atualizarStatus();
+atualizarGraficos();
+setInterval(tick,1000);
+</script>
+</body>
+</html>

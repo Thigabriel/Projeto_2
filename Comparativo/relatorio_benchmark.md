@@ -16,30 +16,30 @@ mesmo protocolo de avaliação (Leave-Groups-Out) usado no cold start do ALMMo-0
 |---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | **ALMMo-0** | **A** | **0.543** | **0.771** | **0.341** | **0.762** | **0.125** | **0.294** | **87.4** | — |
 | **ALMMo-0** | **B** | **0.598** | — | — | — | — | — | — | — |
-| KNN | A | 0.5245 | 0.9299 | 0.0732 | 0.4286 | 0.0833 | 0.1773 | 84.5 | -0.0185 |
-| KNN | C | 0.5830 | 0.8103 | 0.4146 | 0.8095 | 0.1789 | 0.2523 | 85.0 | +0.0400 |
-| KNN | D | 0.5685 | 0.7732 | 0.4878 | 0.8571 | 0.1818 | 0.2870 | 82.8 | +0.0255 |
-| KNN | E | 0.5667 | 0.7670 | 0.5122 | 0.8571 | 0.1842 | 0.2907 | 83.1 | +0.0237 |
-| LogReg | A | 0.3642 | 0.9938 | 0.0000 | 0.0952 | 0.0000 | 0.1554 | 65.1 | -0.1788 |
-| LogReg | B | 0.1928 | 0.0536 | 0.9268 | 0.9048 | 0.0907 | 0.9945 | 82.8 | -0.3502 |
-| LogReg | C | 0.4238 | 0.9134 | 0.0000 | 0.6667 | 0.0000 | 0.2541 | 45.6 | -0.1192 |
-| LogReg | D | 0.2016 | 0.0701 | 0.9268 | 0.8571 | 0.0916 | 0.9762 | 83.2 | -0.3414 |
-| LogReg | E | 0.1952 | 0.0701 | 0.9024 | 0.8571 | 0.0907 | 0.9890 | 81.9 | -0.3478 |
-| Random Forest | A | 0.4110 | 0.9546 | 0.0488 | 0.1429 | 0.0833 | 0.1773 | 77.2 | -0.1320 |
-| Random Forest | B | 0.4507 | 0.9505 | 0.0488 | 0.2381 | 0.0800 | 0.1755 | 78.5 | -0.0923 |
-| Random Forest | C | 0.5623 | 0.9010 | 0.2683 | 0.5238 | 0.2200 | 0.1956 | 78.4 | +0.0193 |
-| Random Forest | D | 0.5353 | 0.8639 | 0.2195 | 0.6190 | 0.1475 | 0.2340 | 79.2 | -0.0077 |
-| Random Forest | E | 0.5363 | 0.8619 | 0.2439 | 0.6667 | 0.1724 | 0.2395 | 75.2 | -0.0067 |
-| SVC | A | 0.3439 | 1.0000 | 0.0000 | 0.0476 | 0.0000 | 0.1481 | 67.2 | -0.1991 |
-| SVC | B | 0.3933 | 0.4247 | 0.9024 | 0.9048 | 0.1510 | 0.6545 | 74.4 | -0.1497 |
-| SVC | C | 0.4740 | 0.7443 | 0.2683 | 0.8095 | 0.1111 | 0.3620 | 74.7 | -0.0690 |
-| SVC | D | 0.4209 | 0.4784 | 0.8780 | 0.9048 | 0.1614 | 0.5996 | 73.8 | -0.1221 |
-| SVC | E | 0.4166 | 0.4577 | 0.9024 | 0.9524 | 0.1595 | 0.6161 | 74.3 | -0.1264 |
-| XGBoost | A | 0.5041 | 0.9320 | 0.1463 | 0.3333 | 0.1714 | 0.1828 | 78.0 | -0.0389 |
-| XGBoost | B | 0.5541 | 0.9093 | 0.3171 | 0.3810 | 0.2500 | 0.1883 | 78.8 | +0.0111 |
-| XGBoost | C | 0.5822 | 0.8804 | 0.3171 | 0.6190 | 0.2131 | 0.2048 | 80.9 | +0.0392 |
-| XGBoost | D | 0.5800 | 0.8639 | 0.3659 | 0.6190 | 0.2113 | 0.2157 | 82.0 | +0.0370 |
-| XGBoost | E | 0.5976 | 0.8515 | 0.4146 | 0.7143 | 0.2237 | 0.2212 | 81.4 | +0.0546 |
+| KNN | A | 0.3256 | 0.9949 | 0.0244 | 0.0000 | 0.3333 | 0.1634 | 72.4 | -0.2174 |
+| KNN | C | 0.3898 | 0.9040 | 0.0732 | 0.2500 | 0.1667 | 0.2715 | 60.2 | -0.1532 |
+| KNN | D | 0.3864 | 0.7955 | 0.2195 | 0.2500 | 0.1837 | 0.3929 | 57.6 | -0.1566 |
+| KNN | E | 0.3807 | 0.7677 | 0.2439 | 0.2500 | 0.1818 | 0.4283 | 56.3 | -0.1623 |
+| LogReg | A | 0.3110 | 1.0000 | 0.0000 | 0.0000 | 0.0000 | 0.1611 | 71.9 | -0.2320 |
+| LogReg | B | 0.3300 | 0.5783 | 0.3902 | 0.2500 | 0.1429 | 0.6336 | 59.3 | -0.2130 |
+| LogReg | C | 0.3110 | 1.0000 | 0.0000 | 0.0000 | 0.0000 | 0.1611 | 71.9 | -0.2320 |
+| LogReg | D | 0.3151 | 0.5227 | 0.4146 | 0.2500 | 0.1532 | 0.7329 | 52.4 | -0.2279 |
+| LogReg | E | 0.3283 | 0.6111 | 0.3902 | 0.1250 | 0.1509 | 0.5982 | 59.6 | -0.2147 |
+| Random Forest | A | 0.3234 | 0.9874 | 0.0244 | 0.0000 | 0.1667 | 0.1700 | 73.8 | -0.2196 |
+| Random Forest | B | 0.3234 | 0.9874 | 0.0244 | 0.0000 | 0.1667 | 0.1700 | 73.8 | -0.2196 |
+| Random Forest | C | 0.3796 | 0.9343 | 0.0488 | 0.1875 | 0.1818 | 0.2384 | 61.5 | -0.1634 |
+| Random Forest | D | 0.3879 | 0.8687 | 0.1463 | 0.1875 | 0.1765 | 0.3024 | 63.0 | -0.1551 |
+| Random Forest | E | 0.3801 | 0.8535 | 0.1463 | 0.1875 | 0.1818 | 0.3311 | 58.5 | -0.1629 |
+| SVC | A | 0.3110 | 1.0000 | 0.0000 | 0.0000 | 0.0000 | 0.1611 | 71.9 | -0.2320 |
+| SVC | B | 0.3491 | 0.6742 | 0.2195 | 0.3125 | 0.1765 | 0.5960 | 43.0 | -0.1939 |
+| SVC | C | 0.3110 | 1.0000 | 0.0000 | 0.0000 | 0.0000 | 0.1611 | 71.9 | -0.2320 |
+| SVC | D | 0.3165 | 0.5631 | 0.2439 | 0.3750 | 0.1370 | 0.7373 | 43.9 | -0.2265 |
+| SVC | E | 0.3156 | 0.5909 | 0.1951 | 0.3750 | 0.1231 | 0.7064 | 43.9 | -0.2274 |
+| XGBoost | A | 0.3234 | 0.9874 | 0.0244 | 0.0000 | 0.1667 | 0.1700 | 73.8 | -0.2196 |
+| XGBoost | B | 0.3321 | 0.9722 | 0.0488 | 0.0000 | 0.1538 | 0.1810 | 75.8 | -0.2109 |
+| XGBoost | C | 0.3646 | 0.9268 | 0.0976 | 0.0625 | 0.1739 | 0.2340 | 69.1 | -0.1784 |
+| XGBoost | D | 0.3532 | 0.8535 | 0.1463 | 0.0625 | 0.1500 | 0.3245 | 63.9 | -0.1898 |
+| XGBoost | E | 0.3859 | 0.8359 | 0.2195 | 0.1250 | 0.2368 | 0.3554 | 55.0 | -0.1571 |
 
 ## 2.2. Dataset v7 binário — 2 classes (C1+C2 fundidas em classe 1)
 
@@ -48,41 +48,41 @@ mesmo protocolo de avaliação (Leave-Groups-Out) usado no cold start do ALMMo-0
 | Algoritmo | Método | F1-macro | Rec.C0 | Rec.C1 | Prec.C1 | Δ ALMMo-0 |
 |---|:---:|:---:|:---:|:---:|:---:|:---:|
 | **ALMMo-0** | **B** | **0.644** | — | — | — | — |
-| KNN | A | 0.5723 | 0.9237 | 0.2097 | 0.2600 | -0.0717 |
-| KNN | C | 0.6273 | 0.8454 | 0.5000 | 0.2925 | -0.0167 |
-| KNN | D | 0.6244 | 0.7814 | 0.6613 | 0.2789 | -0.0196 |
-| KNN | E | 0.6303 | 0.7835 | 0.6774 | 0.2857 | -0.0137 |
-| LogReg | A | 0.4992 | 0.9938 | 0.0323 | 0.4000 | -0.1448 |
-| LogReg | B | 0.1815 | 0.0804 | 0.9839 | 0.1203 | -0.4625 |
-| LogReg | C | 0.5981 | 0.9443 | 0.2258 | 0.3415 | -0.0459 |
-| LogReg | D | 0.1817 | 0.0825 | 0.9677 | 0.1188 | -0.4623 |
-| LogReg | E | 0.1778 | 0.0784 | 0.9677 | 0.1183 | -0.4662 |
-| Random Forest | A | 0.5461 | 0.9505 | 0.1290 | 0.2500 | -0.0979 |
-| Random Forest | B | 0.5123 | 0.9464 | 0.0806 | 0.1613 | -0.1317 |
-| Random Forest | C | 0.5993 | 0.9175 | 0.2742 | 0.2982 | -0.0447 |
-| Random Forest | D | 0.6171 | 0.8742 | 0.4032 | 0.2907 | -0.0269 |
-| Random Forest | E | 0.6051 | 0.8825 | 0.3548 | 0.2785 | -0.0389 |
-| SVC | A | 0.4863 | 1.0000 | 0.0161 | 1.0000 | -0.1577 |
-| SVC | B | 0.4800 | 0.4825 | 0.9355 | 0.1877 | -0.1640 |
-| SVC | C | 0.5465 | 0.8000 | 0.3548 | 0.1849 | -0.0975 |
-| SVC | D | 0.4797 | 0.5216 | 0.7903 | 0.1744 | -0.1643 |
-| SVC | E | 0.4949 | 0.5052 | 0.9355 | 0.1946 | -0.1491 |
-| XGBoost | A | 0.5891 | 0.9340 | 0.2258 | 0.3043 | -0.0549 |
-| XGBoost | B | 0.6195 | 0.9072 | 0.3387 | 0.3182 | -0.0245 |
-| XGBoost | C | 0.5816 | 0.9052 | 0.2581 | 0.2581 | -0.0624 |
-| XGBoost | D | 0.6309 | 0.8763 | 0.4355 | 0.3103 | -0.0131 |
-| XGBoost | E | 0.6085 | 0.8866 | 0.3548 | 0.2857 | -0.0355 |
+| KNN | A | 0.4824 | 0.9949 | 0.0175 | 0.3333 | -0.1616 |
+| KNN | C | 0.5338 | 0.9571 | 0.1053 | 0.2609 | -0.1102 |
+| KNN | D | 0.5358 | 0.8409 | 0.2456 | 0.1818 | -0.1082 |
+| KNN | E | 0.5438 | 0.8308 | 0.2807 | 0.1928 | -0.1002 |
+| LogReg | A | 0.4664 | 1.0000 | 0.0000 | 0.0000 | -0.1776 |
+| LogReg | B | 0.5400 | 0.7929 | 0.3333 | 0.1881 | -0.1040 |
+| LogReg | C | 0.4664 | 1.0000 | 0.0000 | 0.0000 | -0.1776 |
+| LogReg | D | 0.5335 | 0.7626 | 0.3684 | 0.1826 | -0.1105 |
+| LogReg | E | 0.5221 | 0.7626 | 0.3333 | 0.1681 | -0.1219 |
+| Random Forest | A | 0.4806 | 0.9899 | 0.0175 | 0.2000 | -0.1634 |
+| Random Forest | B | 0.4797 | 0.9874 | 0.0175 | 0.1667 | -0.1643 |
+| Random Forest | C | 0.4945 | 0.9848 | 0.0351 | 0.2500 | -0.1495 |
+| Random Forest | D | 0.5499 | 0.8636 | 0.2456 | 0.2059 | -0.0941 |
+| Random Forest | E | 0.5777 | 0.8712 | 0.2982 | 0.2500 | -0.0663 |
+| SVC | A | 0.4664 | 1.0000 | 0.0000 | 0.0000 | -0.1776 |
+| SVC | B | 0.5137 | 0.8864 | 0.1404 | 0.1509 | -0.1303 |
+| SVC | C | 0.4664 | 1.0000 | 0.0000 | 0.0000 | -0.1776 |
+| SVC | D | 0.5012 | 0.7677 | 0.2632 | 0.1402 | -0.1428 |
+| SVC | E | 0.5059 | 0.8889 | 0.1228 | 0.1373 | -0.1381 |
+| XGBoost | A | 0.4968 | 0.9899 | 0.0351 | 0.3333 | -0.1472 |
+| XGBoost | B | 0.5046 | 0.9747 | 0.0526 | 0.2308 | -0.1394 |
+| XGBoost | C | 0.5307 | 0.9722 | 0.0877 | 0.3125 | -0.1133 |
+| XGBoost | D | 0.5532 | 0.8687 | 0.2456 | 0.2121 | -0.0908 |
+| XGBoost | E | 0.5359 | 0.8662 | 0.2105 | 0.1846 | -0.1081 |
 
 ## 3. Diagnóstico
 
 ### Cenário 3 classes (v7)
 
-**Melhor resultado:** F1-macro = 0.5976 (XGBoost com ADASYN)
+**Melhor resultado:** F1-macro = 0.3898 (KNN com SMOTE Parcial 15%)
 **Referência ALMMo-0:** 0.598
 
 **Diagnóstico: PROBLEMA PREDOMINANTEMENTE DO DATASET**
 
-O melhor algoritmo clássico atingiu F1-macro = 0.5976 (< 0.60). 
+O melhor algoritmo clássico atingiu F1-macro = 0.3898 (< 0.60). 
 O sinal discriminativo das 4 features é insuficiente para separar as classes 
 com confiança, independentemente do algoritmo. O ALMMo-0 está competitivo 
 dado suas restrições.
@@ -92,35 +92,37 @@ interação tensão × chuva) ou em mais dados simulados cobrindo casos-limite.
 
 ### Cenário binário (v7_bin)
 
-**Melhor resultado:** F1-macro = 0.6309 (XGBoost com SMOTE Integral)
+**Melhor resultado:** F1-macro = 0.5777 (Random Forest com ADASYN)
 **Referência ALMMo-0:** 0.644
 
-**Diagnóstico: PROBLEMA MISTO (dataset + algoritmo)**
+**Diagnóstico: PROBLEMA PREDOMINANTEMENTE DO DATASET**
 
-O melhor algoritmo clássico atingiu F1-macro = 0.6309 (entre 0.60 e 0.70). 
-Parte do problema é o dataset (desbalanceamento estrutural), parte é o algoritmo 
-(limitações do ALMMo-0 online).
+O melhor algoritmo clássico atingiu F1-macro = 0.5777 (< 0.60). 
+O sinal discriminativo das 4 features é insuficiente para separar as classes 
+com confiança, independentemente do algoritmo. O ALMMo-0 está competitivo 
+dado suas restrições.
 
-**Recomendação:** Prosseguir com o ALMMo-0 mas priorizar geração de dataset 
-melhor calibrado (mais amostras de C1/C2 via calibração com dados reais de campo).
+**Recomendação:** Focar em features adicionais (delta de tensão dia a dia, 
+interação tensão × chuva) ou em mais dados simulados cobrindo casos-limite.
 
 
 ### Comparações Específicas
 
-**Random Forest vs ALMMo-0 (3 classes):** Random Forest superou o ALMMo-0 em 1.9 pontos percentuais (< 15pp). A diferença é moderada.
+**Random Forest vs ALMMo-0 (3 classes):** Random Forest superou o ALMMo-0 em -15.5 pontos percentuais (< 15pp). A diferença é moderada.
 
-**KNN vs ALMMo-0:** Diferença de apenas 4.0pp (< 5pp). Resultado especialmente informativo — ambos usam distância euclidiana, mas o KNN tem acesso a todos os dados de treino. A compactação de memória do ALMMo-0 não causa perda significativa de informação.
+**KNN vs ALMMo-0:** Diferença de 15.3pp (≥ 5pp).
 
 ### Impacto da Reformulação Binária (v7 → v7_bin)
 
-- **LogReg:** 3 classes=0.4238 → binário=0.5981 (Δ=+17.4pp ✓ ≥10pp)
-- **SVC:** 3 classes=0.4740 → binário=0.5465 (Δ=+7.3pp)
-- **Random Forest:** 3 classes=0.5623 → binário=0.6171 (Δ=+5.5pp)
-- **KNN:** 3 classes=0.5830 → binário=0.6303 (Δ=+4.7pp)
-- **XGBoost:** 3 classes=0.5976 → binário=0.6309 (Δ=+3.3pp)
+- **LogReg:** 3 classes=0.3300 → binário=0.5400 (Δ=+21.0pp ✓ ≥10pp)
+- **SVC:** 3 classes=0.3491 → binário=0.5137 (Δ=+16.5pp ✓ ≥10pp)
+- **Random Forest:** 3 classes=0.3879 → binário=0.5777 (Δ=+19.0pp ✓ ≥10pp)
+- **KNN:** 3 classes=0.3898 → binário=0.5438 (Δ=+15.4pp ✓ ≥10pp)
+- **XGBoost:** 3 classes=0.3859 → binário=0.5532 (Δ=+16.7pp ✓ ≥10pp)
 
-Nem todos os algoritmos melhoraram ≥ 10pp com a reformulação binária. 
-O ganho é parcial e dependente do algoritmo/tratamento.
+**⚠ TODOS os algoritmos melhoram ≥ 10pp com formulação binária.** 
+Recomendação forte: implementar ALMMo-0 binário para a fase de campo, 
+com sub-classificação da classe 1 após acumulação de dados reais.
 
 ## 4. Gráficos
 
